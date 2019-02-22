@@ -97,40 +97,25 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2019/02/22/hello-world (2)/" class="h3 title" target="_self">Hello World</a>
+                    <a href="/2017/12/22/zookeeper源码阅读之watch/" class="h3 title" target="_self">zookeeper源码阅读之watch</a>
                     
-                    <p>Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you ca...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2019-02-22
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2019/02/22/测试文章/" class="h3 title" target="_self">测试文章</a>
-                    
-                    <p>测试标题
-这是测试内容
+                    <p>watcher 流程概述watcher 用来客户端监听某一节点的特性变化，执行对应的操作. 从下图可以看出 watcher 的流程主要包括:
+
+
+
+watcher 注册, 包括客户端注册, 服务端的注册
+watcher 触发
+watcher 执行
 
 ...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2019-02-22
+                        <i class="material-icons">date_range</i>2017-12-22
                         
                             <i class="material-icons">bookmark_border</i>
                                 
-                                    java &nbsp;
-                                
-                                    后端 &nbsp;
+                                    zookeeper &nbsp;
                                 
                         
                     </p>
@@ -143,138 +128,20 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2019/02/21/hello-world/" class="h3 title" target="_self">Hello World</a>
+                    <a href="/2017/12/21/NIO-selector的wakeup/" class="h3 title" target="_self">NIO selector的wakeup</a>
                     
-                    <p>Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you ca...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2019-02-21
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" class="h3 title" target="_self">TCP：三次握手、四次握手、backlog及其他</a>
-                    
-                    <p>参考博客　TCP：三次握手、四次握手、backlog及其他
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-13
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/11/Java内存模型/" class="h3 title" target="_self">Java内存模型</a>
-                    
-                    <p>定义Java 虚拟机规范中通过定义一种 Java 内存模型来屏蔽掉各种硬件和操作系统的内存访问差异，以实现 Java 程序在各种平台下都能达到一致的内存访问效果。
-主内存与工作内存主内存 : 在 Java 内存模型中规定了所有的变量都存储在主内存中。工作内存 : 每个线程都有自己的工作内存，在工作内存中保存了该线程使用到的变量的主内存副本拷贝；线程...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-11
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/05/Jdk之LinkedHashMap/" class="h3 title" target="_self">Jdk之LinkedHashMap</a>
-                    
-                    <p>概述LinkedHashMap 与 HashMap 的不同之处在于前者遍历有序，后者遍历无序
+                    <p>wakeUp
+某个线程调用select()方法后阻塞了，即使没有通道已经就绪，也有办法让其从select()方法返回。只要让其它线程在第一个线程调用select()方法的那个对象上调用Selector.wakeup()方法即可。阻塞在select()方法上的线程会立马返回。如果有其它线程调用了wakeup()方法，但当前没有线程阻塞在select()方法上，下个调用select()方法的线程会立即“醒来（wake up）”。
 
-从上图中可以看出 LinkedHashMap 继承至 HashMap , 并重写了 init, createEntry, addEntry, iterator 等方法。
-同时新增了全局变量 header, 并自定义了 LinkedHashMap.Entry 内部类...</p>
+引用至 http://ifeve.com/selectors/...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-05
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/05/Jdk之HashMap/" class="h3 title" target="_self">Jdk之HashMap</a>
-                    
-                    <p>概述HashMap 是散列表的一种基于拉链法的实现方式。
-本文先看下 HashMap 的迭代实现方式
-    private abstract class HashIterator&lt;E&gt; implements Iterator&lt;E&gt; {
-        Entry&lt;K,V&gt; next;        // nex...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-05
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/01/jdk之TreeMap/" class="h3 title" target="_self">jdk之TreeMap</a>
-                    
-                    <p>定义TreeMap 基于红黑树实现
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-01
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/02/28/jdk之LinkedList/" class="h3 title" target="_self">jdk之LinkedList</a>
-                    
-                    <p>定义public class LinkedList&lt;E&gt;
-    extends AbstractSequentialList&lt;E&gt;
-        implements List&lt;E&gt;, Deque&lt;E&gt;, Cloneable, java.io.Serializable
-
-从定义可以看出 LinkedList 实现了接口 List, Deque, 表明其支持列表,栈，队列，双端队列的操作。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-02-28
+                        <i class="material-icons">date_range</i>2017-12-21
                         
                             <i class="material-icons">bookmark_border</i>
                                 
-                                    jdk &nbsp;
+                                    NIO &nbsp;
                                 
                         
                     </p>
@@ -287,13 +154,170 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2018/02/26/数据结构-平衡二叉树/" class="h3 title" target="_self">数据结构-平衡二叉树</a>
+                    <a href="/2017/12/15/zookeeper源码阅读之client/" class="h3 title" target="_self">zookeeper源码阅读之client</a>
                     
-                    <p>概念平衡二叉树平衡二叉树(Self-Balancing Binary Search Tree) 是一种二叉排序树，其中每一个节点的左子树和右子树的高度差至多等于１。...</p>
+                    <p>zookeeper client 启动流程
+先看下 zookeeper client 相关类图
+
+执行 zkCli.sh 脚本时, 会运行 org.apache.zookeeper.ZookeeperMain 类主方法.public static void main(String args[])
+        throws KeeperException, IOException, InterruptedException
+{
+    ZooKeeperMain main = new ZooKeeperMain(args);
+    main.run();
+}
+
+
+public ZooKeeperMain(String args[]) throws IOException, InterruptedException {
+    // 启动参数解析
+    cl.parseOptions(args);
+    System.out.println(&quot;Connecting to &quot; + cl.getOption(&quot;server&quot;));
+    // 链接 zookeeper server
+    connectToZK(cl.getOption(&quot;server&quot;));
+}
+
+
+从代码中可以看出 client 启动时首先构造 ZookeeperMain　对象实例,构造过程中会先解析 client 的启动参数（若未指定任何参数将会默认链接本机 2181 端口 zookeeper server）...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2018-02-26
+                        <i class="material-icons">date_range</i>2017-12-15
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/14/NIO之粘包拆包处理/" class="h3 title" target="_self">NIO之粘包拆包处理</a>
+                    
+                    <p>概述
+我们都知道TCP属于传输层的协议，传输层除了有TCP协议外还有UDP协议。那么UDP是否会发生粘包或拆包的现象呢？答案是不会。UDP是基于报文发送的，从UDP的帧结构可以看出，在UDP首部采用了16bit来指示UDP数据报文的长度，因此在应用层能很好的将不同的数据报文区分开，从而避免粘包和拆包的问题。而TCP是基于字节流的，虽然应用层和TCP传输层之间的数据交互是大小不等的数据块，但是TCP把这些数据块仅仅看成一连串无结构的字节流，没有边界；另外从TCP的帧结构也可以看出，在TCP的首部没有表示数据长度的字段，基于上面两点，在使用TCP传输数据时，才有粘包或者拆包现象发生的可能。
+
+粘包拆包的原因
+关于 tcp 传输过程中，发生粘包拆包的原因及表现形式可参考网上的一篇博客; 这里就不在说明.
+
+粘包拆包的解决方法
+本文给出针对自定义消息报文格式，通过在消息头部添加消息载体长度来处理...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-14
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    NIO &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/13/NIO之ByteBuffer/" class="h3 title" target="_self">NIO之ByteBuffer</a>
+                    
+                    <p>ByteBuffer字段说明
+
+Capacity : Buffer 固定的容量大小
+Position : 表示当前的位置， 初始值为0；当为写模式时，当写入一个字节的时候，position会向前移动到下一个可插入数据的buffer单元；当为读模式时，position会重置为0，每读取一个字节的时候，position会向前移动下一个可读取的位置。
+Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacity; 读模式下limit = position
+
+
+初始化
+采用jvm堆内存初始
+
+  /**
+   * 定义初始容量10字节的缓冲区 capacity=10, limit=10, position=0
+   */
+  ByteBuffer byteBuffer = ByteBuffer.allocate(10);
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-13
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    NIO &nbsp;
+                                
+                                    bytebuffer &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/12/zookeeper源码阅读之server/" class="h3 title" target="_self">zookeeper源码阅读之server</a>
+                    
+                    <p>zookeeper server 启动流程概述
+此次只针对单机模式对 server 端的启动流程分析, 首先看下 zookeeper server 启动时序图，如下：
+
+
+
+其启动流程如下：
+
+执行 zkServer.sh start 脚本, 会调用 QuorumPeerMain.main(); 执行 initializeAndRun 方法
+调用 QuorumPeerConfig.parse() 方法，该方法主要是对启动参数的解析并加载相应的配置文件
+通过上文解析的配置, 判断当前启动模式是否为集群或单机模式
+单机模式下调用 ZookeeperServerMain.main() 方法
+执行 ZookeeperServerMain.initializeAndRun 方法
+调用 ServerConfig.parse 再次解析启动参数加载配置文件
+调用 runFromConfig , 在该方法中依次启动 JettyAdminServer.start(), NIOServerCnxnFactory.startup()
+
+
+
+至此 zookeeper server 完成单机模式下启动，接下来将详细看下 NIOServerCnxnFactory.startup 的启动过程。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-12
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    zookeeper &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/12/vim编写markdown实时预览/" class="h3 title" target="_self">VIM 支持 markdown 预览</a>
+                    
+                    <p>安装 vim 插件管理器 vundle下载 vundle    git clone https://github.com/VundleVim/Vundle.vim ~/.vim/bundle/Vundle.vim
+编辑 vim 配置文件 vimrc
+通过 apt-get install vim 安装的 vim 配置文件路径为 /etc/vim/vimrc
+
+    vim /etc/vim/vimrc
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-12
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    vim &nbsp;
+                                
                         
                     </p>
                     
@@ -305,10 +329,10 @@
         
     <div class="text-center">
         
-        
             <a class="btn btn-primary btn-just-icon btn-round" href="/page/2/">
-                <i class="material-icons">navigate_next</i>
+                <i class="material-icons">navigate_before</i>
             </a>
+        
         
     </div>
 

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>Netty客户端链接派发分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">Netty客户端链接派发分析</h1>
+        <p class="text-center"><b>星期六, 一月 20日 2018, 10:39 上午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <p>在上篇针对 Netty 的服务端启动过程进行了分析，我们知道服务端包含了两个 NioEventLoopGroup, 一个是 boss 用于接收客户端的请求，一个是 worker 用于处理客户端的读写操作；那么 boss group 是如何将客户端链接通道派发到 worker 呢？本文主要针对这个问题进行分析。</p>
+<a id="more"></a>
+<h5 id="NioEventLoop"><a href="#NioEventLoop" class="headerlink" title="NioEventLoop"></a>NioEventLoop</h5><p>上文中我们知道 netty 主要通过 NioEventLoop 内部的线程处理客户端请求，那么我们接下来详细看下该线程的实现：</p>
+<pre><code class="java">protected SingleThreadEventExecutor(
+            EventExecutorGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp, int maxPendingTasks,
+            RejectedExecutionHandler rejectedHandler) {
+        if (threadFactory == null) {
+            throw new NullPointerException(&quot;threadFactory&quot;);
+        }
+
+        this.parent = parent;
+        this.addTaskWakesUp = addTaskWakesUp;
+
+        thread = threadFactory.newThread(new Runnable() {
+            @Override
+            public void run() {
+                boolean success = false;
+                updateLastExecutionTime();
+                try {
+                    SingleThreadEventExecutor.this.run();
+                    success = true;
+                } catch (Throwable t) {
+                    logger.warn(&quot;Unexpected exception from an event executor: &quot;, t);
+                } finally {
+
+                }
+            }
+        });
+        threadProperties = new DefaultThreadProperties(thread);
+        this.maxPendingTasks = Math.max(16, maxPendingTasks);
+        taskQueue = newTaskQueue();
+        rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, &quot;rejectedHandler&quot;);
+    }
+</code></pre>
+<p>NioEventLoop 内部的线程运行时会调用抽象方法 run, 其实现如下：</p>
+<pre><code class="java">protected void run() {
+        for (;;) {
+            try {
+                switch (selectStrategy.calculateStrategy(selectNowSupplier, hasTasks())) {
+                    case SelectStrategy.CONTINUE:
+                        continue;
+                    case SelectStrategy.SELECT:
+                        select(wakenUp.getAndSet(false));
+
+                        if (wakenUp.get()) {
+                            selector.wakeup();
+                        }
+                        // fall through
+                    default:
+                }
+
+                cancelledKeys = 0;
+                needsToSelectAgain = false;
+                final int ioRatio = this.ioRatio;
+                if (ioRatio == 100) {
+                    try {
+                        processSelectedKeys();
+                    } finally {
+                        // Ensure we always run tasks.
+                        runAllTasks();
+                    }
+                } else {
+                    final long ioStartTime = System.nanoTime();
+                    try {
+                        processSelectedKeys();
+                    } finally {
+                        // Ensure we always run tasks.
+                        final long ioTime = System.nanoTime() - ioStartTime;
+                        runAllTasks(ioTime * (100 - ioRatio) / ioRatio);
+                    }
+                }
+            } catch (Throwable t) {
+                handleLoopException(t);
+            }
+            // Always handle shutdown even if the loop processing threw an exception.
+            try {
+                if (isShuttingDown()) {
+                    closeAll();
+                    if (confirmShutdown()) {
+                        return;
+                    }
+                }
+            } catch (Throwable t) {
+                handleLoopException(t);
+            }
+        }
+    }
+</code></pre>
+<p>该线程内部以“死循环”的方式 执行 select 后处理 selectedKeys :</p>
+<pre><code class="java">private void processSelectedKeys() {
+        if (selectedKeys != null) {
+            processSelectedKeysOptimized();
+        } else {
+            processSelectedKeysPlain(selector.selectedKeys());
+        }
+    }
+</code></pre>
+<p>selectedKeys 是在NioEventLoop构建时创建的SelectedSelectionKeySet实例，故会调用 processSelectedKeysOptimized 方法如下：</p>
+<pre><code class="java">private void processSelectedKeysOptimized() {
+        for (int i = 0; i &lt; selectedKeys.size; ++i) {
+            final SelectionKey k = selectedKeys.keys[i];
+            // null out entry in the array to allow to have it GC&#39;ed once the Channel close
+            // See https://github.com/netty/netty/issues/2363
+            selectedKeys.keys[i] = null;
+
+            final Object a = k.attachment();
+
+            if (a instanceof AbstractNioChannel) {
+                processSelectedKey(k, (AbstractNioChannel) a);
+            } else {
+                @SuppressWarnings(&quot;unchecked&quot;)
+                NioTask&lt;SelectableChannel&gt; task = (NioTask&lt;SelectableChannel&gt;) a;
+                processSelectedKey(k, task);
+            }
+
+            if (needsToSelectAgain) {
+                // null out entries in the array to allow to have it GC&#39;ed once the Channel close
+                // See https://github.com/netty/netty/issues/2363
+                selectedKeys.reset(i + 1);
+
+                selectAgain();
+                i = -1;
+            }
+        }
+    }
+</code></pre>
+<p>其实现是循环遍历 selectedKeys 集合中的 selectedKey 进行处理，那么此时我们会有一个疑惑：</p>
+<pre><code>selector 选择器中就绪的通道的 selectedKey 是如何添加到 selectedKeys 集合中呢？
+</code></pre><p>让我们回过头在看下 NioEventLoop 开启 selector 的过程：</p>
+<pre><code class="java">private SelectorTuple openSelector() {
+        final Selector unwrappedSelector;
+        try {
+            // 开启 selector 返回 EpollSelectorImpl 实例
+            unwrappedSelector = provider.openSelector();
+        } catch (IOException e) {
+            throw new ChannelException(&quot;failed to open a new selector&quot;, e);
+        }
+
+        if (DISABLE_KEYSET_OPTIMIZATION) {
+            return new SelectorTuple(unwrappedSelector);
+        }
+
+        final SelectedSelectionKeySet selectedKeySet = new SelectedSelectionKeySet();
+
+        // ......
+
+        final Class&lt;?&gt; selectorImplClass = (Class&lt;?&gt;) maybeSelectorImplClass;
+
+        Object maybeException = AccessController.doPrivileged(new PrivilegedAction&lt;Object&gt;() {
+            @Override
+            public Object run() {
+                try {
+                    Field selectedKeysField = selectorImplClass.getDeclaredField(&quot;selectedKeys&quot;);
+                    Field publicSelectedKeysField = selectorImplClass.getDeclaredField(&quot;publicSelectedKeys&quot;);
+
+                    Throwable cause = ReflectionUtil.trySetAccessible(selectedKeysField);
+                    if (cause != null) {
+                        return cause;
+                    }
+                    cause = ReflectionUtil.trySetAccessible(publicSelectedKeysField);
+                    if (cause != null) {
+                        return cause;
+                    }
+                    // 将 Selector 实现类的属性 selectedKeys 替换为 netty 自定义的　SelectedSelectionKeySet
+                    // 这样当选择器　有就绪的通道时　就会把 selectKey 添加到　SelectedSelectionKeySet　中
+                    selectedKeysField.set(unwrappedSelector, selectedKeySet);
+                    publicSelectedKeysField.set(unwrappedSelector, selectedKeySet);
+                    return null;
+                } catch (NoSuchFieldException e) {
+                    return e;
+                } catch (IllegalAccessException e) {
+                    return e;
+                }
+            }
+        });
+
+        if (maybeException instanceof Exception) {
+            selectedKeys = null;
+            Exception e = (Exception) maybeException;
+            logger.trace(&quot;failed to instrument a special java.util.Set into: {}&quot;, unwrappedSelector, e);
+            return new SelectorTuple(unwrappedSelector);
+        }
+        selectedKeys = selectedKeySet;
+        logger.trace(&quot;instrumented a special java.util.Set into: {}&quot;, unwrappedSelector);
+        return new SelectorTuple(unwrappedSelector,
+                                 new SelectedSelectionKeySetSelector(unwrappedSelector, selectedKeySet));
+    }
+</code></pre>
+<p>从代码中可以看出 NioEventLoop 内部对于 selector 进行了包装，通过反射对 EpollSelectorImpl 实例内字段 selectedKeys publicSelectedKeys 替换为 SelectedSelectionKeySet 实例；这样就保证了当选择器有就绪的通道时就会把 selectKey 添加到 selectedSelectionKeySet 中</p>
+<p>我们在回到 processSelectedKeysOptimized 方法中，当集合中有就绪的 selectedKey 时，会获取绑定在该 key 上的附件 attachment 针对服务端来说 也就是 NioServerSocketChannel （注册的时候绑定的)；接下来会调用 processSelectedKey 如下：</p>
+<pre><code class="java">private void processSelectedKey(SelectionKey k, AbstractNioChannel ch) {
+        final NioUnsafe unsafe = ch.unsafe();
+            try {
+            int readyOps = k.readyOps();
+            // We first need to call finishConnect() before try to trigger a read(...) or write(...) as otherwise
+            // the NIO JDK channel implementation may throw a NotYetConnectedException.
+            if ((readyOps &amp; SelectionKey.OP_CONNECT) != 0) {
+                // remove OP_CONNECT as otherwise Selector.select(..) will always return without blocking
+                // See https://github.com/netty/netty/issues/924
+                int ops = k.interestOps();
+                ops &amp;= ~SelectionKey.OP_CONNECT;
+                k.interestOps(ops);
+
+                unsafe.finishConnect();
+            }
+
+            // Process OP_WRITE first as we may be able to write some queued buffers and so free memory.
+            if ((readyOps &amp; SelectionKey.OP_WRITE) != 0) {
+                // Call forceFlush which will also take care of clear the OP_WRITE once there is nothing left to write
+                ch.unsafe().forceFlush();
+            }
+
+            // Also check for readOps of 0 to workaround possible JDK bug which may otherwise lead
+            // to a spin loop
+            if ((readyOps &amp; (SelectionKey.OP_READ | SelectionKey.OP_ACCEPT)) != 0 || readyOps == 0) {
+                unsafe.read();
+            }
+        } catch (CancelledKeyException ignored) {
+            unsafe.close(unsafe.voidPromise());
+        }
+    }
+</code></pre>
+<p>因服务端监听的是 ACCEPT 事件，故当有客户端链接请求就绪的时候会调用 unsafe.read() ,此时 unsafe 实例为 NioMessageSafe:</p>
+<pre><code class="java">public void read() {
+            assert eventLoop().inEventLoop();
+            final ChannelConfig config = config();
+            if (!config.isAutoRead() &amp;&amp; !isReadPending()) {
+                // ChannelConfig.setAutoRead(false) was called in the meantime
+                removeReadOp();
+                return;
+            }
+
+            final int maxMessagesPerRead = config.getMaxMessagesPerRead();
+            final ChannelPipeline pipeline = pipeline();
+            boolean closed = false;
+            Throwable exception = null;
+            try {
+                try {
+                    for (;;) {
+                        int localRead = doReadMessages(readBuf);
+                        // 当没有客户端通道时退出
+                        if (localRead == 0) {
+                            break;
+                        }
+                        if (localRead &lt; 0) {
+                            closed = true;
+                            break;
+                        }
+
+                        // stop reading and remove op
+                        if (!config.isAutoRead()) {
+                            break;
+                        }
+
+                        if (readBuf.size() &gt;= maxMessagesPerRead) {
+                            break;
+                        }
+                    }
+                } catch (Throwable t) {
+                    exception = t;
+                }
+                setReadPending(false);
+                int size = readBuf.size();
+                for (int i = 0; i &lt; size; i ++) {
+                    // 触发 pipeline 的 channelRead 事件
+                    pipeline.fireChannelRead(readBuf.get(i));
+                }
+
+                readBuf.clear();
+                // 触发 pipeline 的 channelReadComplete 事件
+                pipeline.fireChannelReadComplete();
+
+                if (exception != null) {
+                    closed = closeOnReadError(exception);
+
+                    pipeline.fireExceptionCaught(exception);
+                }
+
+                if (closed) {
+                    if (isOpen()) {
+                        close(voidPromise());
+                    }
+                }
+            } finally {
+
+            }
+        }
+</code></pre>
+<pre><code class="java">protected int doReadMessages(List&lt;Object&gt; buf) throws Exception {
+        // 获取客户端通道
+        SocketChannel ch = SocketUtils.accept(javaChannel());
+
+        try {
+            if (ch != null) {
+                // 将 nio socketChannel 封装为 NioSocketChannell 添加到 buf　集合中
+                buf.add(new NioSocketChannel(this, ch));
+                return 1;
+            }
+        } catch (Throwable t) {
+            logger.warn(&quot;Failed to create a new channel from an accepted socket.&quot;, t);
+
+            try {
+                ch.close();
+            } catch (Throwable t2) {
+                logger.warn(&quot;Failed to close a socket.&quot;, t2);
+            }
+        }
+
+        return 0;
+    }
+</code></pre>
+<p>其流程为：</p>
+<ul>
+<li>获取客户端通道 socketChannel 并将其封装为 NioSocketChannel 添加到缓冲中</li>
+<li>触发 pipeline 的 channelRead 事件</li>
+<li>触发 pipeline 的 channelReadComplete 事件</li>
+</ul>
+<p>最终会触发 ServerBootstrapAcceptor handler 的 channelRead 事件如下： </p>
+<pre><code class="java">public void channelRead(ChannelHandlerContext ctx, Object msg) {
+            // msg 为 NioSocketChannel 实例
+            final Channel child = (Channel) msg;
+            // 将 ServerBootstrap 设置的 childHandler 添加到 NioSocketChannel 的 pipeline 中
+            child.pipeline().addLast(childHandler);
+
+            setChannelOptions(child, childOptions, logger);
+
+            for (Entry&lt;AttributeKey&lt;?&gt;, Object&gt; e: childAttrs) {
+                child.attr((AttributeKey&lt;Object&gt;) e.getKey()).set(e.getValue());
+            }
+
+            try {
+                // childGroup 也就是我们所理解的 wrker group
+                // 执行注册 nioSocketChannel 即将 NioSocektChannel 注册到 worker group 中的 NioEventLoop 的 selector
+                childGroup.register(child).addListener(new ChannelFutureListener() {
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if (!future.isSuccess()) {
+                            forceClose(child, future.cause());
+                        }
+                    }
+                });
+            } catch (Throwable t) {
+                forceClose(child, t);
+            }
+        }
+</code></pre>
+<p>channelReadComplete 事件在执行过程中最终会调用 NioSocktChannel 的 doBegingRead 方法如下：</p>
+<pre><code class="java">protected void doBeginRead() throws Exception {
+        // Channel.read() or ChannelHandlerContext.read() was called
+        if (inputShutdown) {
+            return;
+        }
+
+        final SelectionKey selectionKey = this.selectionKey;
+        if (!selectionKey.isValid()) {
+            return;
+        }
+
+        readPending = true;
+
+        final int interestOps = selectionKey.interestOps();
+        if ((interestOps &amp; readInterestOp) == 0) {
+            // NioSocetChannel 创建的时候 readInterestop 值为 O_READ
+            selectionKey.interestOps(interestOps | readInterestOp);
+        }
+    }
+</code></pre>
+<pre><code class="java">protected AbstractNioByteChannel(Channel parent, SelectableChannel ch) {
+        super(parent, ch, SelectionKey.OP_READ);
+    }
+</code></pre>
+<pre><code>至此将 SocketChannel 客户端通道注册到 worker group 中的 NioEventLoop　内的 selector 并监听 OP_READ 事件。
+</code></pre><p>此时 netty 内部线程模型如下：<br><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnn453ozrvj30rh09oq3n.jpg" alt></p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;netty</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/01/20/Netty客户端链接派发分析/'; 
+            this.page.identifier = '/2018/01/20/Netty客户端链接派发分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

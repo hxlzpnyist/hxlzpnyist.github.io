@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>NIO之ByteBuffer ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">NIO之ByteBuffer</h1>
+        <p class="text-center"><b>星期三, 十二月 13日 2017, 5:14 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h3 id="ByteBuffer"><a href="#ByteBuffer" class="headerlink" title="ByteBuffer"></a>ByteBuffer</h3><h6 id="字段说明"><a href="#字段说明" class="headerlink" title="字段说明"></a>字段说明</h6><blockquote>
+<ul>
+<li>Capacity : Buffer 固定的容量大小</li>
+<li>Position : 表示当前的位置， 初始值为0；当为写模式时，当写入一个字节的时候，position会向前移动到下一个可插入数据的buffer单元；当为读模式时，position会重置为0，每读取一个字节的时候，position会向前移动下一个可读取的位置。</li>
+<li>Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacity; 读模式下limit = position</li>
+</ul>
+</blockquote>
+<h6 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h6><blockquote>
+<p>采用jvm堆内存初始</p>
+</blockquote>
+<pre><code class="java">  /**
+   * 定义初始容量10字节的缓冲区 capacity=10, limit=10, position=0
+   */
+  ByteBuffer byteBuffer = ByteBuffer.allocate(10);
+</code></pre>
+<a id="more"></a>
+<blockquote>
+<p>采用堆外内存初始</p>
+</blockquote>
+<pre><code class="java">  /**
+   * 定义初始容量10字节的缓冲区 capacity=10, limit=10, position=0
+   */
+  ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10);
+
+</code></pre>
+<h6 id="put-byte-byte"><a href="#put-byte-byte" class="headerlink" title="put(byte byte)"></a>put(byte byte)</h6><blockquote>
+<p>写入数据时，每写入一个字节的时候 会检验 position &gt;= limit, 之后执行position++ 自增操作；</p>
+</blockquote>
+<pre><code class="java">  public Bytebuffer put (byte x) {
+    hb[ix(nextPutIndex())] = x;
+    return this;
+  }
+
+  int nextPutIndex () {
+    if (position &gt;= limit) {
+      throw new BufferOverflowException();
+    }
+    return position++;
+  }
+</code></pre>
+<p><img src="https://timgsa.baidu.com/timg?image&amp;quality=80%20&amp;size=b10000_10000&amp;sec=1505116488784&amp;di=a0dd847eedd460ace788f23a94157178&amp;imgtype=jpg&amp;src=http%3A%2F%2Fh.hiphotos.baidu.com%2Fimage%2Fpic%2Fitem%2F4610b912c8fcc3ce6443e4179945d688d43f2016.jpg" alt="put"></p>
+<h6 id="flip"><a href="#flip" class="headerlink" title="flip()"></a>flip()</h6><blockquote>
+<p>buffer 由写模式切换到读模式; limit 值为position， position会重置为0</p>
+</blockquote>
+<pre><code class="java">
+  public final Buffer flip() {
+    limit = position;
+    position = 0;
+    mark = -1;
+    return this;
+  }
+
+</code></pre>
+<p><img src="https://timgsa.baidu.com/timg?image&amp;quality=80%20&amp;size=b10000_10000&amp;sec=1505118021655&amp;di=bb23319c2e5d519a3da9d2961127c26b&amp;imgtype=jpg&amp;src=http%3A%2F%2Fe.hiphotos.baidu.com%2Fimage%2Fpic%2Fitem%2F63d9f2d3572c11df5590ab07682762d0f703c255.jpg" alt="flip"></p>
+<h6 id="get"><a href="#get" class="headerlink" title="get()"></a>get()</h6><blockquote>
+<p>buffer 读取数据的时候，检验position&gt;=limit; 之后执行position++</p>
+</blockquote>
+<pre><code class="java">  public byte get() {
+    return hb[ix(nextGetIndex())];
+  }
+
+  int nextGetIndex () {
+    if (position &gt;= limit){
+      throw new BufferUnderflowException();
+    }
+    return position++;
+  }
+</code></pre>
+<p><img src="https://timgsa.baidu.com/timg?image&amp;quality=80%20&amp;size=b10000_10000&amp;sec=1505118511420&amp;di=86d6d65d0d9d00faa5be956ddaa08ec7&amp;imgtype=jpg&amp;src=http%3A%2F%2Fg.hiphotos.baidu.com%2Fimage%2Fpic%2Fitem%2F77c6a7efce1b9d16a3e08a45f8deb48f8c5464ea.jpg" alt></p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;NIO</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;bytebuffer</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2017/12/13/NIO之ByteBuffer/'; 
+            this.page.identifier = '/2017/12/13/NIO之ByteBuffer/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

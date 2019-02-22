@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>Netty服务端启动源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">Netty服务端启动源码分析</h1>
+        <p class="text-center"><b>星期三, 一月 17日 2018, 4:28 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <p>  Netty 是一个高性能异步事件驱动的 NIO 框架, 因其底层采用的 NIO, 故其启动过程一样可以分为以下几个步骤:</p>
+<ul>
+<li>selector 多路复用选择器开启</li>
+<li>ServerSocketChannel 通道建立并绑定端口</li>
+<li>ServerSocketChannel 通道注册到 selector 并监听 accept 事件</li>
+</ul>
+<p>在进行服务端启动分析前，我们先看下 netty 的服务端使用示例。</p>
+<a id="more"></a>
+<h5 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h5><pre><code class="java">// Configure the server.
+EventLoopGroup bossGroup = new NioEventLoopGroup(1);
+EventLoopGroup workerGroup = new NioEventLoopGroup();
+try {
+    ServerBootstrap b = new ServerBootstrap();
+    b.group(bossGroup, workerGroup)
+        .channel(NioServerSocketChannel.class)
+         .handler(new LoggingHandler(LogLevel.INFO))
+         .childHandler(new ChannelInitializer&lt;SocketChannel&gt;() {
+             @Override
+             public void initChannel(SocketChannel ch) throws Exception {
+                 ChannelPipeline p = ch.pipeline();
+                 if (sslCtx != null) {
+                     p.addLast(sslCtx.newHandler(ch.alloc()));
+                 }    
+                 p.addLast(new EchoServerHandler());
+             }
+         });
+
+    // Start the server.
+    ChannelFuture f = b.bind(PORT).sync();
+
+    // Wait until the server socket is closed.
+    f.channel().closeFuture().sync();
+} finally {
+    // Shut down all event loops to terminate all threads.
+    bossGroup.shutdownGracefully();
+    workerGroup.shutdownGracefully();
+}
+</code></pre>
+<p>从示例可以看出 netty 服务端通过创建 ServerBootstrap 实例，并对其配置 EventLoopGroup, channel, handler 之后即完成服务端的启动。</p>
+<h5 id="NioEventLoopGroup-selector的创建"><a href="#NioEventLoopGroup-selector的创建" class="headerlink" title="NioEventLoopGroup - selector的创建"></a>NioEventLoopGroup - selector的创建</h5><p>从示例中可以看出 ServerBootstrap 启动的过程中需要两个 EventLoopGroup 实例，从职责上可以将其分为两种 boss 和 worker;前者主要负责客户端链接的接收以及派发到 worker, 后者主要负责客户端链接的读写请求操作。</p>
+<h6 id="NioEventLoopGroup-的创建"><a href="#NioEventLoopGroup-的创建" class="headerlink" title="NioEventLoopGroup 的创建"></a>NioEventLoopGroup 的创建</h6><pre><code class="java">
+    public NioEventLoopGroup(int nThreads) {
+        this(nThreads, null);
+    }
+
+    public NioEventLoopGroup(int nThreads, ThreadFactory threadFactory) {
+        this(nThreads, threadFactory, SelectorProvider.provider());
+    }        
+
+    public NioEventLoopGroup(int nThreads, ThreadFactory threadFactory, final SelectorProvider selectorProvider) {
+        this(nThreads, threadFactory, selectorProvider, DefaultSelectStrategyFactory.INSTANCE);
+    }    
+
+    public NioEventLoopGroup(int nThreads, ThreadFactory threadFactory, final SelectorProvider selectorProvider, final SelectStrategyFactory selectStrategyFactory) {
+        super(nThreads, threadFactory, selectorProvider, selectStrategyFactory, RejectedExecutionHandlers.reject());
+    }
+</code></pre>
+<pre><code class="java">static {
+        DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
+                &quot;io.netty.eventLoopThreads&quot;, NettyRuntime.availableProcessors() * 2));
+
+        if (logger.isDebugEnabled()) {
+            logger.debug(&quot;-Dio.netty.eventLoopThreads: {}&quot;, DEFAULT_EVENT_LOOP_THREADS);
+        }
+    }
+</code></pre>
+<pre><code class="java">    protected MultithreadEventLoopGroup(int nThreads, ThreadFactory threadFactory, Object... args) {
+        super(nThreads == 0? DEFAULT_EVENT_LOOP_THREADS : nThreads, threadFactory, args);
+    }
+</code></pre>
+<p>加载 MultithreadEventLoopGroup 类时，会先计算默认线程数其值为处理器个数的两倍。</p>
+<p>在看下父类MultithreadEventExecutorGroup的构造方法：</p>
+<pre><code class="java">    protected MultithreadEventExecutorGroup(int nThreads, ThreadFactory threadFactory, Object... args) {
+        if (nThreads &lt;= 0) {
+            throw new IllegalArgumentException(String.format(&quot;nThreads: %d (expected: &gt; 0)&quot;, nThreads));
+        }
+
+        if (threadFactory == null) {
+            threadFactory = newDefaultThreadFactory();
+        }
+
+        children = new SingleThreadEventExecutor[nThreads];
+        // 创建 事件执行器的选择器
+        if (isPowerOfTwo(children.length)) {
+            chooser = new PowerOfTwoEventExecutorChooser();
+        } else {
+            chooser = new GenericEventExecutorChooser();
+        }
+
+        for (int i = 0; i &lt; nThreads; i ++) {
+            boolean success = false;
+            try {
+            // 创建 NioEventLoop
+                children[i] = newChild(threadFactory, args);
+                success = true;
+            } catch (Exception e) {
+                // TODO: Think about if this is a good exception type
+                throw new IllegalStateException(&quot;failed to create a child event loop&quot;, e);
+            } finally {
+
+            }     
+        }
+        // 非核心代码省略
+    }
+</code></pre>
+<p>newChild 是抽象方法由子类 NioEventLoopGroup 实现</p>
+<pre><code class="java">    protected EventExecutor newChild(ThreadFactory threadFactory, Object... args) throws Exception {
+        return new NioEventLoop(this, threadFactory, (SelectorProvider) args[0],
+            ((SelectStrategyFactory) args[1]).newSelectStrategy(), (RejectedExecutionHandler) args[2]);
+    }
+</code></pre>
+<p>从上述代码中可以看出 NioEventLoopGroup 构建过程中会按指定的线程数创建 NioEventLoop 实例并存储在 children 事件执行器数组中；同时创建了 chooser 实例，chooser 用于在新的客户端链接请求到达的时候从 children 数组中选取 eventLoop 的策略。</p>
+<h6 id="NioEventLoop的创建"><a href="#NioEventLoop的创建" class="headerlink" title="NioEventLoop的创建"></a>NioEventLoop的创建</h6><p>先看下 NioEventLoop 的构造</p>
+<pre><code class="java">NioEventLoop(NioEventLoopGroup parent, ThreadFactory threadFactory, SelectorProvider selectorProvider,
+                 SelectStrategy strategy, RejectedExecutionHandler rejectedExecutionHandler) {
+        super(parent, threadFactory, false, DEFAULT_MAX_PENDING_TASKS, rejectedExecutionHandler);
+        if (selectorProvider == null) {
+            throw new NullPointerException(&quot;selectorProvider&quot;);
+        }
+        if (strategy == null) {
+            throw new NullPointerException(&quot;selectStrategy&quot;);
+        }
+        provider = selectorProvider;
+        final SelectorTuple selectorTuple = openSelector();
+        // 创建 selector 选择器
+        selector = selectorTuple.selector;
+        unwrappedSelector = selectorTuple.unwrappedSelector;
+        selectStrategy = strategy;
+    }
+</code></pre>
+<p>其父类构造如下：</p>
+<pre><code class="java">    protected SingleThreadEventExecutor(
+            EventExecutorGroup parent, ThreadFactory threadFactory, boolean addTaskWakesUp, int maxPendingTasks,
+            RejectedExecutionHandler rejectedHandler) {
+        if (threadFactory == null) {
+            throw new NullPointerException(&quot;threadFactory&quot;);
+        }
+
+        this.parent = parent;
+        this.addTaskWakesUp = addTaskWakesUp;
+        // 内部线程
+        thread = threadFactory.newThread(new Runnable() {
+            @Override
+            public void run() {
+               // 此处省略线程的具体执行 
+            }
+        });
+        threadProperties = new DefaultThreadProperties(thread);
+        this.maxPendingTasks = Math.max(16, maxPendingTasks);
+        // 任务队列
+        taskQueue = newTaskQueue();
+        rejectedExecutionHandler = ObjectUtil.checkNotNull(rejectedHandler, &quot;rejectedHandler&quot;);
+    }
+</code></pre>
+<pre><code class="java">    protected Queue&lt;Runnable&gt; newTaskQueue() {
+        return newTaskQueue(maxPendingTasks);
+    }
+
+    protected Queue&lt;Runnable&gt; newTaskQueue(int maxPendingTasks) {
+        return new LinkedBlockingQueue&lt;Runnable&gt;(maxPendingTasks);
+    }
+</code></pre>
+<p>从 NioEventLoop 的构造方法可以看出,　其内部包含了一个 thread 以及 taskQueue 并且绑定了一个 selector; taskQueue 用于存储内部执行的任务, thread 该线程主要用来执行 taskQueue 中的任务及处理客户端链接的请求。</p>
+<pre><code>此时完成了 selector 选择器的创建,并将其绑定到 NioEventLoop 实例
+</code></pre><p>在完成了两个 NioEventLoopGroup 实例的创建之后　我们可以看出 Netty 内部线程模型大概如下：</p>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnju1tz4auj30k106h3yg.jpg" alt></p>
+<h5 id="NioServerSocketChannel-通道创建"><a href="#NioServerSocketChannel-通道创建" class="headerlink" title="NioServerSocketChannel 通道创建"></a>NioServerSocketChannel 通道创建</h5><p>ServerBootstrap 在完成 group, channel, handler 的配置之后调用 bind 完成服务端启动，让我们看下其实现:</p>
+<pre><code class="java">     public ChannelFuture bind(int inetPort) {
+        return bind(new InetSocketAddress(inetPort));
+    }
+
+    public ChannelFuture bind(String inetHost, int inetPort) {
+        return bind(SocketUtils.socketAddress(inetHost, inetPort));
+    }
+
+    public ChannelFuture bind(InetAddress inetHost, int inetPort) {
+        return bind(new InetSocketAddress(inetHost, inetPort));
+    }
+
+    public ChannelFuture bind(SocketAddress localAddress) {
+        validate();
+        if (localAddress == null) {
+            throw new NullPointerException(&quot;localAddress&quot;);
+        }
+        return doBind(localAddress);
+    }
+
+    private ChannelFuture doBind(final SocketAddress localAddress) {
+        final ChannelFuture regFuture = initAndRegister();
+        final Channel channel = regFuture.channel();
+        if (regFuture.cause() != null) {
+            return regFuture;
+        }
+
+           // 暂时省略 
+    }
+</code></pre>
+<p>从上述代码中可以在 bind 过程中，先完成 channel 的注册及初始化其实现在 initAndRegister 方法中如下：</p>
+<pre><code class="java">final ChannelFuture initAndRegister() {
+        Channel channel = null;
+        try {
+            // 创建 NioServerSocketChannel
+            channel = channelFactory().newChannel();
+            // 初始化 channel
+            init(channel);
+        } catch (Throwable t) {
+            if (channel != null) {
+                // channel can be null if newChannel crashed (eg SocketException(&quot;too many open files&quot;))
+                channel.unsafe().closeForcibly();
+            }
+            // as the Channel is not registered yet we need to force the usage of the GlobalEventExecutor
+            return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
+        }
+        // channel 注册
+        ChannelFuture regFuture = group().register(channel);
+        if (regFuture.cause() != null) {
+            if (channel.isRegistered()) {
+                channel.close();
+            } else {
+                channel.unsafe().closeForcibly();
+            }
+        }
+        return regFuture;
+    }
+</code></pre>
+<p>从 initAndRegister 方法中可以看出，该方法主要完成以下三件事:</p>
+<ul>
+<li>NioServerSocketChannel 实例的创建</li>
+<li>NioServerSocketChannel 的初始化</li>
+<li>NioServerSocketChannel 的注册</li>
+</ul>
+<h6 id="NioServerSocketChannel的创建"><a href="#NioServerSocketChannel的创建" class="headerlink" title="NioServerSocketChannel的创建"></a>NioServerSocketChannel的创建</h6><p>先让我们回过头看下 ServerBootstrap 启动时配置 channel 方法：</p>
+<pre><code class="java">    public B channel(Class&lt;? extends C&gt; channelClass) {
+        if (channelClass == null) {
+            throw new NullPointerException(&quot;channelClass&quot;);
+        }
+        return channelFactory(new BootstrapChannelFactory&lt;C&gt;(channelClass));
+    }
+
+       public B channelFactory(ChannelFactory&lt;? extends C&gt; channelFactory) {
+        if (channelFactory == null) {
+            throw new NullPointerException(&quot;channelFactory&quot;);
+        }
+        if (this.channelFactory != null) {
+            throw new IllegalStateException(&quot;channelFactory set already&quot;);
+        }
+
+        this.channelFactory = channelFactory;
+        return self();
+    }
+</code></pre>
+<p>也就是说此时 channelFactory 实例为 BootstrapChannelFactory, 接下来我们看下其实现：</p>
+<pre><code class="java">private static final class BootstrapChannelFactory&lt;T extends Channel&gt; implements ChannelFactory&lt;T&gt; {
+        private final Class&lt;? extends T&gt; clazz;
+
+        BootstrapChannelFactory(Class&lt;? extends T&gt; clazz) {
+            this.clazz = clazz;
+        }
+
+        @Override
+        public T newChannel() {
+            try {
+                return clazz.getConstructor().newInstance();
+            } catch (Throwable t) {
+                throw new ChannelException(&quot;Unable to create Channel from class &quot; + clazz, t);
+            }
+        }
+    }
+</code></pre>
+<p>故 channelFactory.newChannel() 方法也就是创建指定了 channel class 的实例也就是 NioServerSocketChannel 实例，接下来看下其构造实现：</p>
+<pre><code class="java">private static ServerSocketChannel newSocket(SelectorProvider provider) {
+        try {
+            return provider.openServerSocketChannel();
+        } catch (IOException e) {
+            throw new ChannelException(
+                    &quot;Failed to open a server socket.&quot;, e);
+        }
+    }
+
+    private final ServerSocketChannelConfig config;
+
+    public NioServerSocketChannel() {
+        this(newSocket(DEFAULT_SELECTOR_PROVIDER));
+    }
+
+    public NioServerSocketChannel(SelectorProvider provider) {
+        this(newSocket(provider));
+    }
+
+    public NioServerSocketChannel(ServerSocketChannel channel) {
+        super(null, channel, SelectionKey.OP_ACCEPT);
+        config = new NioServerSocketChannelConfig(this, javaChannel().socket());
+    }
+</code></pre>
+<p>其父类 AbstractNioChannel AbstractChannel 构造方法如下：</p>
+<pre><code class="java">protected AbstractNioChannel(Channel parent, SelectableChannel ch, int readInterestOp) {
+        super(parent);
+        this.ch = ch;
+        this.readInterestOp = readInterestOp;
+        try {
+            ch.configureBlocking(false);
+        } catch (IOException e) {
+        }
+    }
+</code></pre>
+<pre><code class="java">protected AbstractChannel(Channel parent) {
+        this.parent = parent;
+        unsafe = newUnsafe();
+        pipeline = newChannelPipeline();
+    }
+</code></pre>
+<p>从 NioServerSocketChannel 的构造方法看出其主要流程如下:</p>
+<ul>
+<li>通过 newSocket 方法创建了 ServerSocketChannel 实例并设置为非阻塞模式</li>
+<li>设置了待监听事件 OP_ACCEPT</li>
+<li>创建 unsafe 实例为 NioMessageUnsafe</li>
+<li>创建 pipeline 实例为 DefaultChannelPipeline</li>
+</ul>
+<pre><code>此时完成了 nio 中的 ServerSocketChannel 的创建
+</code></pre><h6 id="NioServerSocktChannel的初始化"><a href="#NioServerSocktChannel的初始化" class="headerlink" title="NioServerSocktChannel的初始化"></a>NioServerSocktChannel的初始化</h6><p>init 为抽象方法由子类实现</p>
+<pre><code class="java">void init(Channel channel) throws Exception {
+        final Map&lt;ChannelOption&lt;?&gt;, Object&gt; options = options();
+        synchronized (options) {
+            setChannelOptions(channel, options, logger);
+        }
+
+        final Map&lt;AttributeKey&lt;?&gt;, Object&gt; attrs = attrs();
+        synchronized (attrs) {
+            for (Entry&lt;AttributeKey&lt;?&gt;, Object&gt; e: attrs.entrySet()) {
+                @SuppressWarnings(&quot;unchecked&quot;)
+                AttributeKey&lt;Object&gt; key = (AttributeKey&lt;Object&gt;) e.getKey();
+                channel.attr(key).set(e.getValue());
+            }
+        }
+
+        ChannelPipeline p = channel.pipeline();
+
+        final EventLoopGroup currentChildGroup = childGroup;
+        final ChannelHandler currentChildHandler = childHandler;
+        final Entry&lt;ChannelOption&lt;?&gt;, Object&gt;[] currentChildOptions;
+        final Entry&lt;AttributeKey&lt;?&gt;, Object&gt;[] currentChildAttrs;
+        synchronized (childOptions) {
+            currentChildOptions = childOptions.entrySet().toArray(newOptionArray(childOptions.size()));
+        }
+        synchronized (childAttrs) {
+            currentChildAttrs = childAttrs.entrySet().toArray(newAttrArray(childAttrs.size()));
+        }
+
+        p.addLast(new ChannelInitializer&lt;Channel&gt;() {
+            @Override
+            public void initChannel(final Channel ch) throws Exception {
+                final ChannelPipeline pipeline = ch.pipeline();
+                ChannelHandler handler = handler();
+                if (handler != null) {
+                    pipeline.addLast(handler);
+                }
+
+                logger.info(&quot;ServerBootStrap init channel addLast ChannelInitializer init channel&quot;);
+                ch.eventLoop().execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        pipeline.addLast(new ServerBootstrapAcceptor(
+                                ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
+                    }
+                });
+            }
+        });
+    }
+</code></pre>
+<p>init 主要设置 channel 的 attr 和　options;并在 pipeline 中添加 ChannelInitializer handler</p>
+<h6 id="NioServerSocketChannel的注册"><a href="#NioServerSocketChannel的注册" class="headerlink" title="NioServerSocketChannel的注册"></a>NioServerSocketChannel的注册</h6><p>在完成 channel 的创建及初始化之后即调用 NioEventLoopGroup.register(channel) 方法完成 channel 的注册。</p>
+<pre><code class="java">    @Override
+    public EventLoop next() {
+        return (EventLoop) super.next();
+    }
+
+    @Override
+    public ChannelFuture register(Channel channel) {
+        return next().register(channel);
+    }
+</code></pre>
+<p>next() 方法是按照 chooser 选取策略从 NioEventLoopGroup 中获取一个 NioEventLoop 实例;跟踪 register 方法最终调用的是 unsafe.register 方法如下:</p>
+<pre><code class="java">public final void register(EventLoop eventLoop, final ChannelPromise promise) {
+    // ......
+    AbstractChannel.this.eventLoop = eventLoop;
+
+    if (eventLoop.inEventLoop()) {
+        register0(promise);
+    } else {
+        try {
+            eventLoop.execute(new Runnable() {
+                @Override
+                public void run() {
+                    register0(promise);
+                }
+            });
+        } catch (Throwable t) {
+       }
+    }
+}
+
+private void register0(ChannelPromise promise) {
+    try {
+        // ......
+        boolean firstRegistration = neverRegistered;
+        doRegister();
+
+        neverRegistered = false;
+        registered = true;
+
+        pipeline.invokeHandlerAddedIfNeeded();
+
+        safeSetSuccess(promise);
+        pipeline.fireChannelRegistered();
+
+        // ......                
+    } catch (Throwable t) {
+    }
+}
+</code></pre>
+<p>调用了由子类实现的 doRegister() 方法如下：</p>
+<pre><code class="java">@Override
+protected void doRegister() throws Exception {
+    boolean selected = false;
+    for (;;) {
+    try {
+        // ServerSocketChannel 注册到 selector
+        selectionKey = javaChannel().register(eventLoop().unwrappedSelector(), 0, this);
+        return;
+    } catch (CancelledKeyException e) {
+        if (!selected) {
+            // Force the Selector to select now as the &quot;canceled&quot; SelectionKey may still be
+            // cached and not removed because no Select.select(..) operation was called yet.
+            eventLoop().selectNow();
+            selected = true;
+        } else {
+            // We forced a select operation on the selector before but the SelectionKey is still cached
+            // for whatever reason. JDK bug ?
+            throw e;
+        }
+    }
+    }    
+}
+</code></pre>
+<p>其实现就是将 ServerSocketChannel 注册到 selector 上，并以自身NioServerSocketChannel 作为附件；</p>
+<pre><code>注意：此时注册的时候　监听的事件　并不是 ACCEPT; 而是 0
+</code></pre><h5 id="NioServerSocketChannel-端口绑定"><a href="#NioServerSocketChannel-端口绑定" class="headerlink" title="NioServerSocketChannel 端口绑定"></a>NioServerSocketChannel 端口绑定</h5><p>上文中在完成了 channel 的注册之后，我们在回头看 doBind 的实现:</p>
+<pre><code class="java">private ChannelFuture doBind(final SocketAddress localAddress) {
+        final ChannelFuture regFuture = initAndRegister();
+        final Channel channel = regFuture.channel();
+        if (regFuture.cause() != null) {
+            return regFuture;
+        }
+
+        if (regFuture.isDone()) {
+            ChannelPromise promise = channel.newPromise();
+            doBind0(regFuture, channel, localAddress, promise);
+            return promise;
+        } else {
+            final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+            regFuture.addListener(new ChannelFutureListener() {
+                @Override
+                public void operationComplete(ChannelFuture future) throws Exception {
+                    Throwable cause = future.cause();
+                    if (cause != null) {
+                        promise.setFailure(cause);
+                    } else {
+                        promise.executor = channel.eventLoop();
+                        doBind0(regFuture, channel, localAddress, promise);
+                    }
+                }
+            });
+            return promise;
+        }
+    }
+</code></pre>
+<p>在 channel 注册完成后会执行 doBind0 </p>
+<pre><code class="java">private static void doBind0(
+            final ChannelFuture regFuture, final Channel channel,
+            final SocketAddress localAddress, final ChannelPromise promise) {
+        channel.eventLoop().execute(new Runnable() {
+            @Override
+            public void run() {
+                if (regFuture.isSuccess()) {
+                    channel.bind(localAddress, promise).addListener(ChannelFutureListener.CLOSE_ON_FAILURE);
+                } else {
+                    promise.setFailure(regFuture.cause());
+                }
+            }
+        });
+    }
+</code></pre>
+<p>会调用 channel.bind()　跟踪发现最终会调用 unsafe.bind() 方法如下：</p>
+<pre><code class="java">public final void bind(final SocketAddress localAddress, final ChannelPromise promise) {
+            assertEventLoop();
+            // ......
+            boolean wasActive = isActive();
+            try {
+            // 绑定地址端口
+                doBind(localAddress);
+            } catch (Throwable t) {
+                safeSetFailure(promise, t);
+                closeIfClosed();
+                return;
+            }
+
+            if (!wasActive &amp;&amp; isActive()) {
+            // 绑定端口成功之后　触发 pipeline handler 的 channel active 事件
+                invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        pipeline.fireChannelActive();
+                    }
+                });
+            }
+
+            safeSetSuccess(promise);
+        }
+</code></pre>
+<pre><code class="java">protected void doBind(SocketAddress localAddress) throws Exception {
+        if (PlatformDependent.javaVersion() &gt;= 7) {
+            javaChannel().bind(localAddress, config.getBacklog());
+        } else {
+            javaChannel().socket().bind(localAddress, config.getBacklog());
+        }
+    }
+</code></pre>
+<pre><code>此时完成了 ServerSocketChannel 的服务端地址绑定
+</code></pre><h5 id="NioServerSocketChannel-注册-ACCEPT-事件"><a href="#NioServerSocketChannel-注册-ACCEPT-事件" class="headerlink" title="NioServerSocketChannel 注册 ACCEPT 事件"></a>NioServerSocketChannel 注册 ACCEPT 事件</h5><p>上文中在完成 bind 操作之后，会触发 channelPipeline 的 channel active 事件　最终调用了 channel 的 doBeginRead 方法</p>
+<pre><code class="java">protected void doBeginRead() throws Exception {
+        // Channel.read() or ChannelHandlerContext.read() was called
+        if (inputShutdown) {
+            return;
+        }
+
+        final SelectionKey selectionKey = this.selectionKey;
+        if (!selectionKey.isValid()) {
+            return;
+        }
+
+        readPending = true;
+
+        final int interestOps = selectionKey.interestOps();
+        if ((interestOps &amp; readInterestOp) == 0) {
+            // 将 selectionKey 添加 ACCEPT 事件的监听
+            selectionKey.interestOps(interestOps | readInterestOp);
+        }
+    }
+</code></pre>
+<pre><code>至此完成了 ServerSocketChannel 注册到 selector 并让其监听 ACCEPT　事件；服务端也启动完毕。
+</code></pre><h5 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h5><p>对Netty的服务端启动分析完之后，大概认识了其包含的一些组件以及各组件的作用</p>
+<ul>
+<li>ServerBootstrap ：该类是服务端启动的引导类，其主要用于配置 Netty 的各个组件</li>
+<li>NioEventLoopGroup : 该类用于管理 NioEventLoop , 并提供了 Selector 选择器创建的入口并将其绑定到 NioEventLoop 实例</li>
+<li>NioEventLoop : 该类内部绑定了一个线程以及一个任务队列用于处理 register bind的相关任务及客户端处理（后续会详细分析）</li>
+<li>NioServerSocketChannel : 该类是对 ServerSocketChannel 的一个包装其内部包含了 unsafe channelPipeline 实例</li>
+<li>Unsafe : 该类提供了底层的 register bind write read 等操作</li>
+<li>DefaultChannelPipeline : 该类是个双向链表结构，其主要作用是在通道注册链接　读写的操作之后会触发相应的事件</li>
+</ul>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;netty</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/01/17/Netty服务端启动源码分析/'; 
+            this.page.identifier = '/2018/01/17/Netty服务端启动源码分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

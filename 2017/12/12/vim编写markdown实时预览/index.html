@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>VIM 支持 markdown 预览 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">VIM 支持 markdown 预览</h1>
+        <p class="text-center"><b>星期二, 十二月 12日 2017, 11:28 上午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h3 id="安装-vim-插件管理器-vundle"><a href="#安装-vim-插件管理器-vundle" class="headerlink" title="安装 vim 插件管理器 vundle"></a>安装 vim 插件管理器 <a href="https://github.com/VundleVim/Vundle.vim" target="_blank" rel="noopener">vundle</a></h3><h5 id="下载-vundle"><a href="#下载-vundle" class="headerlink" title="下载 vundle"></a>下载 vundle</h5><pre><code>    git clone https://github.com/VundleVim/Vundle.vim ~/.vim/bundle/Vundle.vim
+</code></pre><h5 id="编辑-vim-配置文件-vimrc"><a href="#编辑-vim-配置文件-vimrc" class="headerlink" title="编辑 vim 配置文件 vimrc"></a>编辑 vim 配置文件 vimrc</h5><blockquote>
+<p>通过 apt-get install vim 安装的 vim 配置文件路径为 /etc/vim/vimrc</p>
+</blockquote>
+<pre><code>    vim /etc/vim/vimrc
+</code></pre><a id="more"></a>
+<blockquote>
+<p>将以下内容添加到 vimrc 文件中</p>
+</blockquote>
+<pre><code class="xml">set nocompatible    &quot; be iMproved, required
+filetype off &quot; required
+
+&quot; 启用vundle来管理vim插件
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
+&quot; 安装插件写在这之后
+
+&quot; let Vundle manage Vundle, required
+Plugin &#39;VundleVim/Vundle.vim&#39;
+
+&quot; 安装插件写在这之前
+call vundle#end() &quot; required
+filetype plugin on 
+
+&quot; required&quot; 常用命令
+&quot; :PluginList - 查看已经安装的插件
+&quot; :PluginInstall - 安装插件
+&quot; :PluginUpdate - 更新插件
+&quot; :PluginSearch - 搜索插件，例如 :PluginSearch xml就能搜到xml相关的插件
+&quot; :PluginClean - 删除插件，把安装插件对应行删除，然后执行这个命令即可
+
+&quot; h: vundle - 获取帮助
+</code></pre>
+<blockquote>
+<p>进入 vim 执行 PluginInstall</p>
+</blockquote>
+<pre><code>    sudo vim
+
+    :PluginInstall
+</code></pre><blockquote>
+<p>插件安装完成后,　左下角会出现 Done！ 至此 vundle 插件管理器安装完成.</p>
+</blockquote>
+<h5 id="安装-vim-instant-markdown-插件"><a href="#安装-vim-instant-markdown-插件" class="headerlink" title="安装 vim-instant-markdown 插件"></a>安装 vim-instant-markdown 插件</h5><blockquote>
+<p>在 vim 配置文件 vimrc 文件中添加以下内容:</p>
+</blockquote>
+<pre><code> Plugin &#39;suan/vim-instant-markdown&#39;
+</code></pre><blockquote>
+<p>再次进入 vim 执行 PluginInstall; 当出现 Done！即表示插件安装完成.　此时 vim xx.md　即可实时预览 markdown 文件;效果如下图所示.</p>
+</blockquote>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm4r0kb2sj31go0qijxk.jpg" alt></p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;vim</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2017/12/12/vim编写markdown实时预览/'; 
+            this.page.identifier = '/2017/12/12/vim编写markdown实时预览/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

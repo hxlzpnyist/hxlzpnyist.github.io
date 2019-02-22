@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>jdk之LinkedList ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">jdk之LinkedList</h1>
+        <p class="text-center"><b>星期三, 二月 28日 2018, 7:54 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h5 id="定义"><a href="#定义" class="headerlink" title="定义"></a>定义</h5><pre><code class="java">public class LinkedList&lt;E&gt;
+    extends AbstractSequentialList&lt;E&gt;
+        implements List&lt;E&gt;, Deque&lt;E&gt;, Cloneable, java.io.Serializable
+</code></pre>
+<p>从定义可以看出 LinkedList 实现了接口 List, Deque, 表明其支持列表,栈，队列，双端队列的操作。</p>
+<a id="more"></a>
+<h5 id="变量"><a href="#变量" class="headerlink" title="变量"></a>变量</h5><pre><code class="java">    transient int size = 0;
+
+    /**
+     * Pointer to first node.
+     * Invariant: (first == null &amp;&amp; last == null) ||
+     *            (first.prev == null &amp;&amp; first.item != null)
+     */
+    transient Node&lt;E&gt; first;
+
+    /**
+     * Pointer to last node.
+     * Invariant: (first == null &amp;&amp; last == null) ||
+     *            (last.next == null &amp;&amp; last.item != null)
+     */
+    transient Node&lt;E&gt; last;
+</code></pre>
+<ul>
+<li>size : 链表元素个数</li>
+<li>first : 指向链表的头节点</li>
+<li>last : 指向链表的尾节点</li>
+</ul>
+<h6 id="内部类"><a href="#内部类" class="headerlink" title="内部类"></a>内部类</h6><pre><code class="java">    private static class Node&lt;E&gt; {
+        E item;
+        Node&lt;E&gt; next;
+        Node&lt;E&gt; prev;
+
+        Node(Node&lt;E&gt; prev, E element, Node&lt;E&gt; next) {
+            this.item = element;
+            this.next = next;
+            this.prev = prev;
+        }
+    }
+</code></pre>
+<p>Node 是 LinkedList 的内部类，定义了链表的节点结构:</p>
+<ul>
+<li>item : 节点存储的元素</li>
+<li>prev : 当前节点的前驱节点</li>
+<li>next : 当前节点的后驱节点</li>
+</ul>
+<h5 id="Api"><a href="#Api" class="headerlink" title="Api"></a>Api</h5><h6 id="add-E"><a href="#add-E" class="headerlink" title="add(E)"></a>add(E)</h6><p>向链表中添加元素</p>
+<pre><code class="java">    public boolean add(E e) {
+        linkLast(e);
+        return true;
+    }
+</code></pre>
+<pre><code class="java">    void linkLast(E e) {
+        final Node&lt;E&gt; l = last;
+        // 定义插入节点
+        final Node&lt;E&gt; newNode = new Node&lt;&gt;(l, e, null);
+        last = newNode;
+        if (l == null)
+            // 链表为空 头尾节点均指向新插入的节点
+            first = newNode;
+        else
+            // 链表的尾节点后驱节点指向新插入的节点
+            l.next = newNode;
+        // 元素个数加一
+        size++;
+        modCount++;
+    }
+</code></pre>
+<ul>
+<li>首先构建待插入的节点</li>
+<li>将尾节点指向待插入的节点</li>
+<li>若原尾节点为空，说明队列为空，将头节点也指向待插入的节点</li>
+<li>若原尾节点非空，则将原尾节点的后驱节点指向待插入节点</li>
+<li>元素个数加一</li>
+</ul>
+<h6 id="add-index-e"><a href="#add-index-e" class="headerlink" title="add(index, e)"></a>add(index, e)</h6><p>向链表中指定的位置插入元素</p>
+<pre><code class="java">    public void add(int index, E element) {
+        // 检查位置index 是否在链表范围内
+        checkPositionIndex(index);
+
+        if (index == size)
+            // 表明在链表的末尾插入节点
+            linkLast(element);
+        else
+            linkBefore(element, node(index));
+    }
+</code></pre>
+<p>node(index) 方法用于获取链表指定位置的节点</p>
+<pre><code class="java">    Node&lt;E&gt; node(int index) {
+        // assert isElementIndex(index);
+        // 判断index 是否比链表长度的一半小；size &gt;&gt; 1 相当于 size/2
+        // 如果小于链表的一半，则从头节点开始遍历
+        // 如果大于链表的一半，则从尾节点开始遍历
+        if (index &lt; (size &gt;&gt; 1)) {
+            Node&lt;E&gt; x = first;
+            for (int i = 0; i &lt; index; i++)
+                x = x.next;
+            return x;
+        } else {
+            Node&lt;E&gt; x = last;
+            for (int i = size - 1; i &gt; index; i--)
+                x = x.prev;
+            return x;
+        }
+    }
+</code></pre>
+<p>linkBefor(E e, Node succ) 方法用于在指定节点前插入元素</p>
+<pre><code class="java">    void linkBefore(E e, Node&lt;E&gt; succ) {
+        // assert succ != null;
+        final Node&lt;E&gt; pred = succ.prev;
+        final Node&lt;E&gt; newNode = new Node&lt;&gt;(pred, e, succ);
+        succ.prev = newNode;
+        if (pred == null)
+            first = newNode;
+        else
+            pred.next = newNode;
+        size++;
+        modCount++;
+    }
+</code></pre>
+<h6 id="set-index-e"><a href="#set-index-e" class="headerlink" title="set(index, e)"></a>set(index, e)</h6><p>更新链表指定位置节点的元素，并返回老的元素</p>
+<pre><code class="java">    public E set(int index, E element) {
+        checkElementIndex(index);
+        // 获取指定位置的节点
+        Node&lt;E&gt; x = node(index);
+        E oldVal = x.item;
+        // 更新节点元素
+        x.item = element;
+        return oldVal;
+    }
+</code></pre>
+<h6 id="get-index"><a href="#get-index" class="headerlink" title="get(index)"></a>get(index)</h6><p>获取链表指定位置的元素</p>
+<pre><code class="java">    public E get(int index) {
+        checkElementIndex(index);
+        // 获取指定位置的节点　然后返回其存储的元素
+        return node(index).item;
+    }
+</code></pre>
+<h6 id="remove-index"><a href="#remove-index" class="headerlink" title="remove(index)"></a>remove(index)</h6><p>删除链表指定位置的节点并返回该节点存储的元素</p>
+<pre><code class="java">    public E remove(int index) {
+        checkElementIndex(index);
+        return unlink(node(index));
+    }
+</code></pre>
+<p>unlink(node) 该方法从字面上理解即解除节点与链表的链接</p>
+<pre><code class="java">    E unlink(Node&lt;E&gt; x) {
+        // assert x != null;
+        final E element = x.item;
+        final Node&lt;E&gt; next = x.next;
+        final Node&lt;E&gt; prev = x.prev;
+
+        if (prev == null) {
+            // 前驱节点为空，说明删除的节点为头节点
+            // 那么将头节点指向删除节点的后驱节点
+            first = next;
+        } else {
+            // 前驱节点不为空
+            // 将前驱节点的后驱节点指向删除节点的后驱节点
+            prev.next = next;
+            // 删除节点的前驱节点指向空
+            x.prev = null;
+        }
+
+        if (next == null) {
+            // 删除节点的后驱节点为空，说明删除节点为尾节点
+            // 那么将尾节点指向删除节点的前驱节点
+            last = prev;
+        } else {
+            // 后驱节点不为空
+            // 将后驱节点的前驱节点指向删除节点的前驱节点
+            next.prev = prev;
+            // 删除节点的后驱节点指向空
+            x.next = null;
+        }
+        //　存储元素改为空,元素个数减一
+        x.item = null;
+        size--;
+        modCount++;
+        return element;
+    }
+</code></pre>
+<h6 id="iterator"><a href="#iterator" class="headerlink" title="iterator()"></a>iterator()</h6><p>链表的迭代, 内部调用的是 listIterator(0) 方法</p>
+<pre><code class="java">    public ListIterator&lt;E&gt; listIterator(int index) {
+        checkPositionIndex(index);
+        return new ListItr(index);
+    }
+</code></pre>
+<pre><code class="java">private class ListItr implements ListIterator&lt;E&gt; {
+        private Node&lt;E&gt; lastReturned = null;
+        private Node&lt;E&gt; next;
+        private int nextIndex;
+        private int expectedModCount = modCount;
+
+        ListItr(int index) {
+            // assert isPositionIndex(index);
+            next = (index == size) ? null : node(index);
+            nextIndex = index;
+        }
+
+        public boolean hasNext() {
+            // nextIndex 小于 size 表明还未遍历到链表结尾
+            return nextIndex &lt; size;
+        }
+
+        public E next() {
+            checkForComodification();
+            if (!hasNext())
+                throw new NoSuchElementException();
+
+            lastReturned = next;
+            // next 指向下一个节点
+            next = next.next;
+            // nextIndex 加一
+            nextIndex++;
+            return lastReturned.item;
+        }
+
+    }
+
+</code></pre>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/02/28/jdk之LinkedList/'; 
+            this.page.identifier = '/2018/02/28/jdk之LinkedList/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

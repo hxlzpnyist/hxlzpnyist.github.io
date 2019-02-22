@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>jdk之ArrayBlockingQueue ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">jdk之ArrayBlockingQueue</h1>
+        <p class="text-center"><b>星期三, 一月 24日 2018, 2:28 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h5 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h5><p>ArrayBlockingQueue 又称为数组阻塞队列；其基于数组实现的有界阻塞队列，能容纳的元素数量固定，一旦创建就不能再增加其容量。</p>
+<p>那么接下来我们会带着以下两个疑问进行分析：</p>
+<ul>
+<li>如何通过数组实现队列的特性 FIFO ?</li>
+<li>如何保证队列插入获取操作的同步 ?</li>
+</ul>
+<a id="more"></a>
+<h5 id="定义"><a href="#定义" class="headerlink" title="定义"></a>定义</h5><p>首先看下 ArrayBlockingQueue 的属性定义　如下：</p>
+<pre><code class="java">    /** 固定大小数组用于存储队列元素 */
+    final Object[] items;
+
+    /** 指向下次获取元素的下标 可以理解为指向队列头部 */
+    int takeIndex;
+
+    /** 指向下次插入元素的下标 可以理解为指向队列尾部 */
+    int putIndex;
+
+    /** 当前队列存储元素的个数 */
+    int count;
+
+    /** 定义可重入锁 */
+    final ReentrantLock lock;
+
+    /** 用于控制 take 操作的 condition */
+    private final Condition notEmpty;
+
+    /** 用于控制 put 操作的 condition */
+    private final Condition notFull;
+
+</code></pre>
+<h5 id="构造函数"><a href="#构造函数" class="headerlink" title="构造函数"></a>构造函数</h5><pre><code class="java">    public ArrayBlockingQueue(int capacity) {
+        this(capacity, false);
+    }
+
+    /**
+     * 创建固定容量的阻塞队列并设置访问策略
+     * @param capacity 队列的最大容量 
+     * @param fair 队列的访问策略，true为公平锁策略, false为非公平锁；默认为 false
+     */
+    public ArrayBlockingQueue(int capacity, boolean fair) {
+        if (capacity &lt;= 0)
+            throw new IllegalArgumentException();
+        this.items = new Object[capacity];
+        lock = new ReentrantLock(fair);
+        notEmpty = lock.newCondition();
+        notFull =  lock.newCondition();
+    }
+
+</code></pre>
+<p>从构造函数可以看出，在创建 ArrayBlockinQueue 实例时，需指定队列最大存储元素的容量并设置内部重入锁的访问策略默认为非公平锁。</p>
+<h5 id="API"><a href="#API" class="headerlink" title="API"></a>API</h5><h6 id="add-E-e"><a href="#add-E-e" class="headerlink" title="add(E e)"></a>add(E e)</h6><pre><code class="java">    public boolean add(E e) {
+        return super.add(e);
+    }
+</code></pre>
+<p>从代码可以看出 ArrayBlockingQueue 的 add 方法的实现是基于父类 AbstractQueu 的实现如下：</p>
+<pre><code class="java">    public boolean add(E e) {
+        if (offer(e))
+            return true;
+        else
+            throw new IllegalStateException(&quot;Queue full&quot;);
+    }
+</code></pre>
+<p>从代码中我们知道 add 方法的主要实现在 offer 方法内（将会在下文分析），如果能够插入成功则返回 true, 否则抛出 IllegalStateException 异常</p>
+<h6 id="remove"><a href="#remove" class="headerlink" title="remove()"></a>remove()</h6><p>remove 方法移除队列的头部元素并返回, 其实现是在父类 AbstractQueue 中如下:</p>
+<pre><code class="java">    public E remove() {
+        E x = poll();
+        if (x != null)
+            return x;
+        else
+            throw new NoSuchElementException();
+    }
+</code></pre>
+<p>如上代码知道 remov的主要实现在 poll 方法内；如果获取的头部元素不为空将返回，若为空则抛出 NoSUchElementException 异常。</p>
+<h6 id="offer-E-e"><a href="#offer-E-e" class="headerlink" title="offer(E e)"></a>offer(E e)</h6><pre><code class="java">    public boolean offer(E e) {
+        // 检查元素是否为空
+        checkNotNull(e);
+        final ReentrantLock lock = this.lock;
+        // 获取锁
+        lock.lock();
+        try {
+            // 元素个数达到最大容量时返回 fae
+            if (count == items.length)
+                return false;
+            // 执行插入返回 true
+            else {
+                insert(e);
+                return true;
+            }
+        } finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+</code></pre>
+<pre><code class="java">    private void insert(E x) {
+        // 将元素插入数组指定的位置
+        items[putIndex] = x;
+        // 将 putIndex 移动到下一个位置
+        putIndex = inc(putIndex);
+        // 元素个数加一
+        ++count;
+        // 当前队列非空，唤醒阻塞在获取元素操作上的线程
+        notEmpty.signal();
+    }
+</code></pre>
+<p>从代码可以看出 offer 方法将元素插入队列的逻辑如下：</p>
+<ul>
+<li>判断元素是否为空</li>
+<li>获取锁</li>
+<li>判断队列是否已满，若已满则返回 false</li>
+<li>通过指针 putIndex 将元素放入数组</li>
+<li>移动指针 putIndex 指向下一个位置</li>
+<li>队列当前元素个数加一</li>
+<li>唤醒阻塞在获取元素操作上的线程</li>
+<li>释放锁</li>
+</ul>
+<h6 id="poll"><a href="#poll" class="headerlink" title="poll()"></a>poll()</h6><pre><code class="java">    public E poll() {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            // 队列空的时候 返回 null; 非空的时候调用 extract
+            return (count == 0) ? null : extract();
+        } finally {
+            lock.unlock();
+        }
+    }
+</code></pre>
+<pre><code class="java">    private E extract() {
+        final Object[] items = this.items;
+        // 获取头部的元素
+        E x = this.&lt;E&gt;cast(items[takeIndex]);
+        // 将队列头部置为空
+        items[takeIndex] = null;
+        // 移动头部指针
+        takeIndex = inc(takeIndex);
+        // 队列元素个数减一
+        --count;
+        // 唤醒因队列满而阻塞的插入操作
+        notFull.signal();
+        return x;
+    }
+</code></pre>
+<p>poll 方法获取头部元素逻辑如下：</p>
+<ul>
+<li>获取锁</li>
+<li>判断队列是否为空，若空则返回 null</li>
+<li>通过 takeIndex 头部指针获取队列头元素</li>
+<li>将队列头部置为空</li>
+<li>移动头部指针指向下个位置</li>
+<li>队列元素个数减一</li>
+<li>唤醒因队列满而阻塞的插入操作</li>
+<li>返回头部元素并释放锁</li>
+</ul>
+<p>此时我们可以看出 ArrayBlockingQueue 中通过两个指针 takeIndex putIndex 的移动来保证队列的 FIFO,如下图所示：</p>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnrtuixm5vj30yb09laa5.jpg" alt></p>
+<pre><code>我们知道数组有界　在队列中又是如何保证循环利用的呢？
+</code></pre><pre><code class="java">    final int inc(int i) {
+        return (++i == items.length) ? 0 : i;
+    }
+</code></pre>
+<p>从  inc 方法可以看出在移动 takeindex putindex 指针的时候，当他们到达末尾的时候重新指向头部。</p>
+<h6 id="offer-E-e-long-timeout-TimeUnit-u"><a href="#offer-E-e-long-timeout-TimeUnit-u" class="headerlink" title="offer(E e,long timeout,TimeUnit u)"></a>offer(E e,long timeout,TimeUnit u)</h6><p>该方法表示在指定的时间内将元素插入队列中，若失败返回 false 。</p>
+<pre><code class="java">    public boolean offer(E e, long timeout, TimeUnit unit)
+        throws InterruptedException {
+
+        checkNotNull(e);
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        // 获取锁
+        lock.lockInterruptibly();
+        try {
+            // 当前元素个数达到队列最大容量时 等待
+            while (count == items.length) {
+                if (nanos &lt;= 0)
+                    // 说明已超时 队列满了插入失败 返回 false
+                    return false;
+                nanos = notFull.awaitNanos(nanos);
+            }
+            // 执行插入
+            insert(e);
+            return true;
+        } finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+</code></pre>
+<p>该方法与 offer(e) 实现基本相同，只是在当队列满的情况下会在设置的 timeout 时间内等待。</p>
+<h6 id="poll-long-timeout-TimeUnit-unit"><a href="#poll-long-timeout-TimeUnit-unit" class="headerlink" title="poll(long timeout, TimeUnit unit)"></a>poll(long timeout, TimeUnit unit)</h6><pre><code class="java">    public E poll(long timeout, TimeUnit unit) throws InterruptedException {
+        long nanos = unit.toNanos(timeout);
+        final ReentrantLock lock = this.lock;
+        // 获取锁
+        lock.lockInterruptibly();
+        try {
+            // 当队列空的时候等待队列有元素；若等待超时之后还未有元素则返回 false
+            while (count == 0) {
+                if (nanos &lt;= 0)
+                    return null;
+                nanos = notEmpty.awaitNanos(nanos);
+            }
+            // 队列非空时　获取头部元素
+            return extract();
+        } finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+</code></pre>
+<p>与 poll() 方法类似，不同之处在于当队列为空的时候等待。</p>
+<h6 id="put-E-e"><a href="#put-E-e" class="headerlink" title="put(E e)"></a>put(E e)</h6><pre><code class="java">    public void put(E e) throws InterruptedException {
+        checkNotNull(e);
+        final ReentrantLock lock = this.lock;
+        // 获取锁
+        lock.lockInterruptibly();
+        try {
+            // 队列满的时候
+            while (count == items.length)
+                // 释放锁当前线程阻塞；等待 take 操作唤醒
+                notFull.await();
+            // 队列未满执行插入
+            insert(e);
+        } finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+</code></pre>
+<p>该方法与 offer 不同之处在于当队列满的时候，当前线程会阻塞直至等待 take 操作唤醒。</p>
+<h6 id="take"><a href="#take" class="headerlink" title="take()"></a>take()</h6><pre><code class="java">    public E take() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        // 获取锁
+        lock.lockInterruptibly();
+        try {
+            // 队列为空的时候
+            while (count == 0)
+                // 释放锁当前线程阻塞；等待 put 操作唤醒
+                notEmpty.await();
+            // 队列非空　获取头部元素
+            return extract();
+        } finally {
+            // 释放锁
+            lock.unlock();
+        }
+    }
+</code></pre>
+<p>该方法与 poll 不同之处在于当队列为空的时候，当前线程会一直阻塞直至等待 put 操作唤醒。</p>
+<h5 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h5><ul>
+<li>ArrayBlockingQueue 采用数组作为元素存储，故其为有界队列</li>
+<li>ArrayBlockingQueue 通过指针 takeIndex putIndex 的移动来实现 FIFO</li>
+<li>ArrayBlockingQueue 通过定义 ReentrantLock 重入锁来保证插入获取操作的同步。也就是当前若有线程在执行插入操作，则获取操作同样会被阻塞。</li>
+</ul>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/01/24/jdk之ArrayBlockingQueue/'; 
+            this.page.identifier = '/2018/01/24/jdk之ArrayBlockingQueue/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

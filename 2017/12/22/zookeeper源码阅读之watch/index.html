@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>zookeeper源码阅读之watch ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">zookeeper源码阅读之watch</h1>
+        <p class="text-center"><b>星期五, 十二月 22日 2017, 3:01 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h4 id="watcher-流程概述"><a href="#watcher-流程概述" class="headerlink" title="watcher 流程概述"></a>watcher 流程概述</h4><pre><code>watcher 用来客户端监听某一节点的特性变化，执行对应的操作. 从下图可以看出 watcher 的流程主要包括:
+</code></pre><p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmpmv1leuxj30tn0gjwff.jpg" alt></p>
+<blockquote>
+<ul>
+<li>watcher 注册, 包括客户端注册, 服务端的注册</li>
+<li>watcher 触发</li>
+<li>watcher 执行</li>
+</ul>
+</blockquote>
+<a id="more"></a>
+<h4 id="watcher-注册"><a href="#watcher-注册" class="headerlink" title="watcher 注册"></a>watcher 注册</h4><pre><code>本文我们以 zookeeper.getData 操作为例，对 watcher 的注册流程就行说明。
+</code></pre><h5 id="watcher-客户端注册"><a href="#watcher-客户端注册" class="headerlink" title="watcher 客户端注册"></a>watcher 客户端注册</h5><pre><code>getData api　如下:
+</code></pre><pre><code class="java">public byte[] getData(final String path, Watcher watcher, Stat stat)
+        throws KeeperException, InterruptedException
+{
+        final String clientPath = path;
+        PathUtils.validatePath(clientPath);
+
+        // the watch contains the un-chroot path
+        WatchRegistration wcb = null;
+        if (watcher != null) {
+                // 定义 watcher 注册
+                wcb = new DataWatchRegistration(watcher, clientPath);
+        }
+
+        final String serverPath = prependChroot(clientPath);
+
+        RequestHeader h = new RequestHeader();
+        h.setType(ZooDefs.OpCode.getData);
+        GetDataRequest request = new GetDataRequest();
+        request.setPath(serverPath);
+        // watcher 不为空的时候　设置为 true
+        request.setWatch(watcher != null);
+        GetDataResponse response = new GetDataResponse();
+        ReplyHeader r = cnxn.submitRequest(h, request, response, wcb);
+        if (r.getErr() != 0) {
+                throw KeeperException.create(KeeperException.Code.get(r.getErr()),
+                                clientPath);
+        }
+        if (stat != null) {
+                DataTree.copyStat(response.getStat(), stat);
+        }
+        return response.getData();
+}
+
+</code></pre>
+<pre><code>在完成本次请求，处理返回 packet 的时候, 会调用 ClinetCnxn.finishPacket(packet) 方法
+</code></pre><pre><code class="java">private void finishPacket(Packet p) {
+    int err = p.replyHeader.getErr();
+    if (p.watchRegistration != null) {
+            // 调用 wwatcher　register; 处理正常的时候 err 值为 0; 可参考类 FinalRequestProcessor
+            p.watchRegistration.register(err);
+    }
+    // 省略
+}
+</code></pre>
+<pre><code>以下为 watchRegistration.register 源码:
+</code></pre><pre><code class="java">public void register(int rc) {
+    if (shouldAddWatch(rc)) {
+        // client　下允许对多个路径设置监听
+        Map&lt;String, Set&lt;Watcher&gt;&gt; watches = getWatches(rc);
+        synchronized(watches) {
+                Set&lt;Watcher&gt; watchers = watches.get(clientPath);
+                if (watchers == null) {
+                        //　同一路径下允许有多个 watcher　
+                        watchers = new HashSet&lt;Watcher&gt;();
+                        watches.put(clientPath, watchers);
+                }
+                watchers.add(watcher);
+        }
+    }
+}
+
+protected boolean shouldAddWatch(int rc) {
+        return rc == 0;
+}
+
+protected Map&lt;String, Set&lt;Watcher&gt;&gt; getWatches(int rc) {
+        return watchManager.dataWatches;
+}
+</code></pre>
+<blockquote>
+<p>从以上代码中可以看出, 客户端在定义 watcher 之后会将其与 path 绑定添加到 ZKWatchManager.dataWatches; 从而完成 watcher 的注册。</p>
+</blockquote>
+<h5 id="watcher-服务端注册"><a href="#watcher-服务端注册" class="headerlink" title="watcher 服务端注册"></a>watcher 服务端注册</h5><p>server 在接收到客户端请求执行 FinalRequestProcessor.processRequest 方法过程中，会执行对 watcher　的注册，这里同样以 getData 操作的代码进行分析:</p>
+<pre><code class="java">    case OpCode.getData: {
+         lastOp = &quot;GETD&quot;;
+         GetDataRequest getDataRequest = new GetDataRequest();
+         ByteBufferInputStream.byteBuffer2Record(request.request,
+                     getDataRequest);
+         DataNode n = zks.getZKDatabase().getNode(getDataRequest.getPath());
+        if (n == null) {
+             throw new KeeperException.NoNodeException();
+         }
+         PrepRequestProcessor.checkACL(zks, zks.getZKDatabase().aclForNode(n),
+                     ZooDefs.Perms.READ,
+                     request.authInfo);
+         Stat stat = new Stat();
+        // 若 client 请求的时候 watch 为 true,　则将 cnxn　作为参数
+        // cnxn 为每个客户端请求链接的时候　针对 selectorKey 绑定的 NIOServerCnxn 实例
+         byte b[] = zks.getZKDatabase().getData(getDataRequest.getPath(), stat,
+                     getDataRequest.getWatch() ? cnxn : null);
+         rsp = new GetDataResponse(b, stat);
+         break;
+    }
+
+</code></pre>
+<p>从上面代码中  zks.getZKDatabase().getData(getDataRequest.getPath(), stat, getDataRequest.getWatch() ? cnxn : null); 跟踪发现其最后调用了 WatchManager.addWatch(path, watcher) 方法.</p>
+<pre><code class="java">// 注意 : 此时传递的参数 watcher 并不是客户端定义的 watcher 实例，而是服务端存储的与客户端绑定的
+// NIOServerCnxn 实例；因为 NIOServerCnxn 实现了 watcher 接口;
+// watchTable 用来存储 path　与　watcher　的关系; 也可以表示为 多个客户端监听了同一节点
+// watch2Paths　用来存储 watcher 与 path 的关系; 也可以表示为 每个客户端下监听了哪些节点
+synchronized void addWatch(String path, Watcher watcher) {
+        HashSet&lt;Watcher&gt; list = watchTable.get(path);
+        if (list == null) {
+                // don&#39;t waste memory if there are few watches on a node
+                // rehash when the 4th entry is added, doubling size thereafter
+                // seems like a good compromise
+                list = new HashSet&lt;Watcher&gt;(4);
+                watchTable.put(path, list);
+        }
+        list.add(watcher);
+
+        HashSet&lt;String&gt; paths = watch2Paths.get(watcher);
+        if (paths == null) {
+                // cnxns typically have many watches, so use default cap here
+                paths = new HashSet&lt;String&gt;();
+                watch2Paths.put(watcher, paths);
+        }
+        paths.add(path);
+}
+
+</code></pre>
+<blockquote>
+<p>从上面代码中可以看出,服务端在处理完客户端请求的时候　若客户端设置了 watcher 则会将其添加到 watchmanager 的 watchTable 中；至此服务端针对 watcher 的注册完毕.</p>
+</blockquote>
+<h4 id="watcher-触发"><a href="#watcher-触发" class="headerlink" title="watcher 触发"></a>watcher 触发</h4><p>针对 watcher 触发的操作，这里以 setData api 为例说明。此时假设某个客户端执行了 setData 操作, 服务端在处理客户端请求的时候, 在调用 FinalRequestProcessor.processRequest　方法的时候会调用 </p>
+<pre><code class="java">    zookeeperServer.processTxn(request);
+</code></pre>
+<p>最终会调用 DataTree.processTxn() 方法，此处摘取针对 setData 的操作如下　：</p>
+<pre><code class="java">case OpCode.setData:
+    SetDataTxn setDataTxn = (SetDataTxn) txn;
+    rc.path = setDataTxn.getPath();
+    rc.stat = setData(setDataTxn.getPath(), setDataTxn
+                .getData(), setDataTxn.getVersion(), header
+                .getZxid(), header.getTime());
+    break;
+</code></pre>
+<pre><code class="java">public Stat setData(String path, byte data[], int version, long zxid,
+                long time) throws KeeperException.NoNodeException {
+        Stat s = new Stat();
+        DataNode n = nodes.get(path);
+        if (n == null) {
+                throw new KeeperException.NoNodeException();
+        }
+        byte lastdata[] = null;
+        synchronized (n) {
+                lastdata = n.data;
+                n.data = data;
+                n.stat.setMtime(time);
+                n.stat.setMzxid(zxid);
+                n.stat.setVersion(version);
+                n.copyStat(s);
+        }
+        // now update if the path is in a quota subtree.
+        String lastPrefix = getMaxPrefixWithQuota(path);
+        if(lastPrefix != null) {
+                // 更新节点数据
+                this.updateBytes(lastPrefix, (data == null ? 0 : data.length)
+                                - (lastdata == null ? 0 : lastdata.length));
+        }
+        // 触发该节点下的 watcher
+        dataWatches.triggerWatch(path, EventType.NodeDataChanged);
+        return s;
+}
+
+</code></pre>
+<p>从上述代码中可以看出, 服务端在完成对节点数据更新之后调用了 watcher.triggerWatch(); 该方法接收两个参数一个为节点path, 一个为事件类型</p>
+<pre><code class="java">Set&lt;Watcher&gt; triggerWatch(String path, EventType type, Set&lt;Watcher&gt; supress) {
+        WatchedEvent e = new WatchedEvent(type,
+                        KeeperState.SyncConnected, path);
+        HashSet&lt;Watcher&gt; watchers;
+        synchronized (this) {
+                watchers = watchTable.remove(path);
+                if (watchers == null || watchers.isEmpty()) {
+                        if (LOG.isTraceEnabled()) {
+                                ZooTrace.logTraceMessage(LOG,
+                                                ZooTrace.EVENT_DELIVERY_TRACE_MASK,
+                                                &quot;No watchers for &quot; + path);
+                        }
+                        return null;
+                }
+                for (Watcher w : watchers) {
+                        HashSet&lt;String&gt; paths = watch2Paths.get(w);
+                        if (paths != null) {
+                                paths.remove(path);
+                        }
+                }
+        }
+        for (Watcher w : watchers) {
+                if (supress != null &amp;&amp; supress.contains(w)) {
+                        continue;
+                }
+                w.process(e);
+        }
+        return watchers;
+}
+
+</code></pre>
+<p>从以上代码中看出在触发 watcher 的时候，会先从 watchManager 中的 watchTable 获取指定 path 的 watcher 并将其从集合中移除（从此处我们可以看出客户端定义的 watcher　若未作处理的话　将只会监听一次）。在查找到 watcher 之后将会调用 watcher.process 即执行 watcher.</p>
+<h4 id="watcher-执行"><a href="#watcher-执行" class="headerlink" title="watcher 执行"></a>watcher 执行</h4><p>在服务端触发 watcher　之后，会调用 watcher.process　方法，此时 watcher 的实例为 NIOServerCnxn;接下来我们看下 NIOSserverCnxn 的 process　方法:</p>
+<pre><code class="java">public void process(WatchedEvent event) {
+        ReplyHeader h = new ReplyHeader(-1, -1L, 0);
+        if (LOG.isTraceEnabled()) {
+                ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
+                                &quot;Deliver event &quot; + event + &quot; to 0x&quot;
+                                + Long.toHexString(this.sessionId)
+                                + &quot; through &quot; + this);
+        }
+
+        // Convert WatchedEvent to a type that can be sent over the wire
+        WatcherEvent e = event.getWrapper();
+
+        sendResponse(h, e, &quot;notification&quot;);
+}
+
+</code></pre>
+<p>从上面代码中可以看出服务端向客户端发出了 tag 为 “notification” 的响应；　接下来我们看下客户端如何处理该响应:<br>在 ClientCnxn 下的 SendThread.readResponse 方法中我们可以看到针对 watcher　的处理如下：</p>
+<pre><code class="java">if (replyHdr.getXid() == -1) {
+        // -1 means notification
+        if (LOG.isDebugEnabled()) {
+                LOG.debug(&quot;Got notification sessionid:0x&quot;
+                                + Long.toHexString(sessionId));
+        }
+        // 从 response 中反序列化
+        WatcherEvent event = new WatcherEvent();
+        event.deserialize(bbia, &quot;response&quot;);
+
+        // convert from a server path to a client path
+        if (chrootPath != null) {
+                String serverPath = event.getPath();
+                if(serverPath.compareTo(chrootPath)==0)
+                        event.setPath(&quot;/&quot;);
+                else if (serverPath.length() &gt; chrootPath.length())
+                        event.setPath(serverPath.substring(chrootPath.length()));
+                else {
+                        LOG.warn(&quot;Got server path &quot; + event.getPath()
+                                        + &quot; which is too short for chroot path &quot;
+                                        + chrootPath);
+                }
+        }
+
+        WatchedEvent we = new WatchedEvent(event);
+        if (LOG.isDebugEnabled()) {
+                LOG.debug(&quot;Got &quot; + we + &quot; for sessionid 0x&quot;
+                                + Long.toHexString(sessionId));
+        }
+        // 将 watchedEvent 交由 eventThread　处理
+        eventThread.queueEvent( we );
+        return;
+}
+
+</code></pre>
+<pre><code class="java">private void queueEvent(WatchedEvent event,
+                Set&lt;Watcher&gt; materializedWatchers) {
+        if (event.getType() == EventType.None
+                        &amp;&amp; sessionState == event.getState()) {
+                return;
+        }
+        sessionState = event.getState();
+        final Set&lt;Watcher&gt; watchers;
+        if (materializedWatchers == null) {
+                // materialize the watchers based on the event
+                // 从 ZKWatchManager 中获取 path　的 watcher
+                watchers = watcher.materialize(event.getState(),
+                                event.getType(), event.getPath());
+        } else {
+                watchers = new HashSet&lt;Watcher&gt;();
+                watchers.addAll(materializedWatchers);
+        }
+        WatcherSetEventPair pair = new WatcherSetEventPair(watchers, event);
+        // queue the pair (watch set &amp; event) for later processing
+        waitingEvents.add(pair);
+}
+
+</code></pre>
+<p>从上面代码看出 客户端在处理 watcher　通知的时候会将其封装为 WatcherSetEventPair 对象并添加到 waitingEvents　队列中此时会唤醒阻塞在队列的操作，也即 eventThread 的 run 方法，如下：</p>
+<pre><code class="java">public void run() {
+        try {
+        isRunning = true;
+        while (true) {
+                Object event = waitingEvents.take();
+                if (event == eventOfDeath) {
+                        wasKilled = true;
+                } else {
+                        processEvent(event);
+                }
+                if (wasKilled)
+                        synchronized (waitingEvents) {
+                                if (waitingEvents.isEmpty()) {
+                                        isRunning = false;
+                                        break;
+                                }
+                        }
+        }
+        } catch (InterruptedException e) {
+                LOG.error(&quot;Event thread exiting due to interruption&quot;, e);
+        }
+
+        LOG.info(&quot;EventThread shut down for session: 0x{}&quot;,
+                        Long.toHexString(getSessionId()));
+}
+
+</code></pre>
+<p>截取 processEvent 方法中针对 watcher 的处理</p>
+<pre><code class="java">f (event instanceof WatcherSetEventPair) {
+        // each watcher will process the event
+        WatcherSetEventPair pair = (WatcherSetEventPair) event;
+        for (Watcher watcher : pair.watchers) {
+                try {
+                        // 执行 watcher
+                        watcher.process(pair.event);
+                } catch (Throwable t) {
+                        LOG.error(&quot;Error while calling watcher &quot;, t);
+                }
+        }
+}
+
+</code></pre>
+<p>从上面代码看出当 waitingEvents　队列中存在待处理的 watcher 时将会依次调用；至此完成 watcher的执行；到此完成对 zookeeper　watcher　的分析.</p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;zookeeper</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2017/12/22/zookeeper源码阅读之watch/'; 
+            this.page.identifier = '/2017/12/22/zookeeper源码阅读之watch/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

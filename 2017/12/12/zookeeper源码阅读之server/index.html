@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>zookeeper源码阅读之server ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">zookeeper源码阅读之server</h1>
+        <p class="text-center"><b>星期二, 十二月 12日 2017, 7:29 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h4 id="zookeeper-server-启动流程概述"><a href="#zookeeper-server-启动流程概述" class="headerlink" title="zookeeper server 启动流程概述"></a>zookeeper server 启动流程概述</h4><blockquote>
+<p>此次只针对单机模式对 server 端的启动流程分析, 首先看下 zookeeper server 启动时序图，如下：</p>
+</blockquote>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm47wn25cj30ys0jlt9k.jpg" alt></p>
+<blockquote>
+<p>其启动流程如下：</p>
+<ul>
+<li>执行 zkServer.sh start 脚本, 会调用 QuorumPeerMain.main(); 执行 initializeAndRun 方法</li>
+<li>调用 QuorumPeerConfig.parse() 方法，该方法主要是对启动参数的解析并加载相应的配置文件</li>
+<li>通过上文解析的配置, 判断当前启动模式是否为集群或单机模式</li>
+<li>单机模式下调用 ZookeeperServerMain.main() 方法</li>
+<li>执行 ZookeeperServerMain.initializeAndRun 方法</li>
+<li>调用 ServerConfig.parse 再次解析启动参数加载配置文件</li>
+<li>调用 runFromConfig , 在该方法中依次启动 JettyAdminServer.start(), NIOServerCnxnFactory.startup()</li>
+</ul>
+</blockquote>
+<blockquote>
+<p>至此 zookeeper server 完成单机模式下启动，接下来将详细看下 NIOServerCnxnFactory.startup 的启动过程。<br><a id="more"></a></p>
+</blockquote>
+<h4 id="zookeeper-server-线程模型"><a href="#zookeeper-server-线程模型" class="headerlink" title="zookeeper server 线程模型"></a>zookeeper server 线程模型</h4><blockquote>
+<p>在 NIOServerCnxnFactory.startup() 启动前, 我们先看下针对 NIOServerCnxnFactory 的对象的创建及相关配置:</p>
+</blockquote>
+<h6 id="NIOServerCnxnFactory-的创建"><a href="#NIOServerCnxnFactory-的创建" class="headerlink" title="NIOServerCnxnFactory 的创建"></a>NIOServerCnxnFactory 的创建</h6><blockquote>
+<p>通过 ServerCnxnFactory.createFactory 完成 ServerCnxnFactory 的创建</p>
+<pre><code class="java">    static public ServerCnxnFactory createFactory() throws IOException {
+        // 获取系统变量 zookeeper.serverCnxnFactory
+        String serverCnxnFactoryName =
+                System.getProperty(ZOOKEEPER_SERVER_CNXN_FACTORY);
+        if (serverCnxnFactoryName == null) {
+            // 若未指定该变量值 则默认返回 NIOServerCnxnFactory; 同时支持 NettyServerCnxnFactory
+                serverCnxnFactoryName = NIOServerCnxnFactory.class.getName();
+        }
+        try {
+                return (ServerCnxnFactory) Class.forName(serverCnxnFactoryName)
+                        .newInstance();
+        } catch (Exception e) {
+                IOException ioe = new IOException(&quot;Couldn&#39;t instantiate &quot;
+                                + serverCnxnFactoryName);
+                ioe.initCause(e);
+                throw ioe;
+        }
+    }
+</code></pre>
+</blockquote>
+<h6 id="NIOServerCnxnFactory-的配置"><a href="#NIOServerCnxnFactory-的配置" class="headerlink" title="NIOServerCnxnFactory 的配置"></a>NIOServerCnxnFactory 的配置</h6><blockquote>
+<p>在执行 startup 前会调用 configure 方法执行相关参数的初始化并绑定 serverSocket </p>
+</blockquote>
+<pre><code class="java">public void configure(InetSocketAddress addr, int maxcc, boolean secure) throws IOException {
+        if (secure) {
+                throw new UnsupportedOperationException(&quot;SSL isn&#39;t supported in NIOServerCnxn&quot;);
+        }
+        configureSaslLogin();
+
+        maxClientCnxns = maxcc;
+        sessionlessCnxnTimeout = Integer.getInteger(
+                        ZOOKEEPER_NIO_SESSIONLESS_CNXN_TIMEOUT, 10000);
+
+        cnxnExpiryQueue =
+                new ExpiryQueue&lt;NIOServerCnxn&gt;(sessionlessCnxnTimeout);
+        expirerThread = new ConnectionExpirerThread();
+        // 返回虚拟机的可用处理器数量　也可认为 cpu 核数
+        int numCores = Runtime.getRuntime().availableProcessors();
+        // 32 cores sweet spot seems to be 4 selector threads
+        // 计算 selectorThread 线程个数
+        numSelectorThreads = Integer.getInteger(
+                        ZOOKEEPER_NIO_NUM_SELECTOR_THREADS,
+                        Math.max((int) Math.sqrt((float) numCores/2), 1));
+        if (numSelectorThreads &lt; 1) {
+                throw new IOException(&quot;numSelectorThreads must be at least 1&quot;);
+        }
+
+        // 工作线程　workerThread　数; 默认为　2*numCores
+        numWorkerThreads = Integer.getInteger(
+                        ZOOKEEPER_NIO_NUM_WORKER_THREADS, 2 * numCores);
+        workerShutdownTimeoutMS = Long.getLong(
+                        ZOOKEEPER_NIO_SHUTDOWN_TIMEOUT, 5000);
+        // 创建 selectorThread 线程集合
+        for(int i=0; i&lt;numSelectorThreads; ++i) {
+                selectorThreads.add(new SelectorThread(i));
+        }
+
+        // 开启服务端链接通道并绑定端口
+        this.ss = ServerSocketChannel.open();
+        ss.socket().setReuseAddress(true);
+        LOG.info(&quot;binding to port &quot; + addr);
+        ss.socket().bind(addr);
+        ss.configureBlocking(false);
+
+        // 创建 AcceptThread 并绑定 ServerSocketChannel selecorThreads　
+        acceptThread = new AcceptThread(ss, addr, selectorThreads);
+}
+</code></pre>
+<h6 id="NIOServerCnxnFactory-的启动"><a href="#NIOServerCnxnFactory-的启动" class="headerlink" title="NIOServerCnxnFactory 的启动"></a>NIOServerCnxnFactory 的启动</h6><blockquote>
+<p>启动过程包括 NIOServerCnxnFactory 的启动和 ZookeeperServer 的启动<br><code>`</code>java<br>        @Override<br>    public void startup(ZooKeeperServer zks, boolean startServer)<br>        throws IOException, InterruptedException {<br>        start();<br>        setZooKeeperServer(zks);<br>        if (startServer) {<br>                zks.startdata();<br>                zks.startup();<br>        }<br>    }</p>
+</blockquote>
+<pre><code>
+```java
+public void start() {
+        stopped = false;
+        if (workerPool == null) {
+                workerPool = new WorkerService(
+                                &quot;NIOWorker&quot;, numWorkerThreads, false);
+        }
+        for(SelectorThread thread : selectorThreads) {
+                if (thread.getState() == Thread.State.NEW) {
+                        thread.start();
+                }
+        }
+        // ensure thread is started once and only once
+        if (acceptThread.getState() == Thread.State.NEW) {
+                acceptThread.start();
+        }
+        if (expirerThread.getState() == Thread.State.NEW) {
+                expirerThread.start();
+        }
+}
+</code></pre><blockquote>
+<p>从代码中可以看出 NIOServerCnxnFactory 启动的时候开启了 AcceptThread SelectorThread ExpirerThread workerPool</p>
+</blockquote>
+<h6 id="AcceptThread"><a href="#AcceptThread" class="headerlink" title="AcceptThread"></a>AcceptThread</h6><pre><code class="java">public void run() {
+    try {
+        // 当 server 未停止　并且 serverSocket 未关闭的时候一直轮询执行select()
+        while (!stopped &amp;&amp; !acceptSocket.socket().isClosed()) {
+                try {
+                        select();
+                } catch (RuntimeException e) {
+                        LOG.warn(&quot;Ignoring unexpected runtime exception&quot;, e);
+                } catch (Exception e) {
+                        LOG.warn(&quot;Ignoring unexpected exception&quot;, e);
+                }
+        }
+    } finally {
+        closeSelector();
+        // This will wake up the selector threads, and tell the
+        // worker thread pool to begin shutdown.
+        if (!reconfiguring) {                    
+                NIOServerCnxnFactory.this.stop();
+        }
+        LOG.info(&quot;accept thread exitted run method&quot;);
+    }
+}
+</code></pre>
+<pre><code class="java">private void select() {
+    try {
+        selector.select();
+
+        Iterator&lt;SelectionKey&gt; selectedKeys =
+                selector.selectedKeys().iterator();
+        while (!stopped &amp;&amp; selectedKeys.hasNext()) {
+                SelectionKey key = selectedKeys.next();
+                selectedKeys.remove();
+
+                if (!key.isValid()) {
+                        continue;
+                }
+                if (key.isAcceptable()) {
+                        if (!doAccept()) {
+                            pauseAccept(10);
+                        }
+                } else {
+                        LOG.warn(&quot;Unexpected ops in accept select &quot;
+                                        + key.readyOps());
+                }
+        }
+    } catch (IOException e) {
+        LOG.warn(&quot;Ignoring IOException while selecting&quot;, e);
+    }
+}
+</code></pre>
+<pre><code class="java">private boolean doAccept() {
+        boolean accepted = false;
+        SocketChannel sc = null;
+        try {
+                // 获取客户端链接
+                sc = acceptSocket.accept();
+                accepted = true;
+                InetAddress ia = sc.socket().getInetAddress();
+                int cnxncount = getClientCnxnCount(ia);
+                // 判断该客户端连接数是否超过最大值
+                if (maxClientCnxns &gt; 0 &amp;&amp; cnxncount &gt;= maxClientCnxns){
+                        throw new IOException(&quot;Too many connections from &quot; + ia
+                                        + &quot; - max is &quot; + maxClientCnxns );
+                }
+
+                LOG.info(&quot;Accepted socket connection from &quot;
+                                + sc.socket().getRemoteSocketAddress());
+                sc.configureBlocking(false);
+
+                // Round-robin assign this connection to a selector thread
+                // 选取一个 selectorThread
+                if (!selectorIterator.hasNext()) {
+                        selectorIterator = selectorThreads.iterator();
+                }
+                SelectorThread selectorThread = selectorIterator.next();
+                // 将接收到的链接　添加到　selector thread 的接收队列中
+                if (!selectorThread.addAcceptedConnection(sc)) {
+                        throw new IOException(
+                                        &quot;Unable to add connection to selector queue&quot;
+                                        + (stopped ? &quot; (shutdown in progress)&quot; : &quot;&quot;));
+                }
+                acceptErrorLogger.flush();
+        } catch (IOException e) {
+                // accept, maxClientCnxns, configureBlocking
+                acceptErrorLogger.rateLimitLog(
+                                &quot;Error accepting new connection: &quot; + e.getMessage());
+                fastCloseSock(sc);
+        }
+        return accepted;
+}
+</code></pre>
+<blockquote>
+<p> 从代码中可以看出 AcceptThread 主要用来接收客户端的链接，并将就绪的客户端链接添加到 selectorThread线程对象的 acceptQueue 中</p>
+</blockquote>
+<h6 id="SelectorThread"><a href="#SelectorThread" class="headerlink" title="SelectorThread"></a>SelectorThread</h6><pre><code class="java">public boolean addAcceptedConnection(SocketChannel accepted) {
+        if (stopped || !acceptedQueue.offer(accepted)) {
+                return false;
+        }
+        // 当接收到一个链接的时候, 唤醒阻塞在 selector.select(）操作上的线程
+        wakeupSelector();
+        return true;
+}
+</code></pre>
+<blockquote>
+<p>当 AcceptThread 将就绪的客户端链接添加到 selectorThread 对象的 acceptQueue 队列中的时候，同时会唤醒阻塞在 acceptQueue.poll() , selector.select() 操作的实例</p>
+</blockquote>
+<pre><code class="java">public void run() {
+        try {
+                while (!stopped) {
+                        try {
+                                select();
+                                // 处理 acceptedQueue 队列里面的客户端链接
+                                processAcceptedConnections();
+                                processInterestOpsUpdateRequests();
+                        } catch (RuntimeException e) {
+                                LOG.warn(&quot;Ignoring unexpected runtime exception&quot;, e);
+                        } catch (Exception e) {
+                                LOG.warn(&quot;Ignoring unexpected exception&quot;, e);
+                        }
+                }
+
+                // Close connections still pending on the selector. Any others
+                // with in-flight work, let drain out of the work queue.
+                for (SelectionKey key : selector.keys()) {
+                        NIOServerCnxn cnxn = (NIOServerCnxn) key.attachment();
+                        if (cnxn.isSelectable()) {
+                                cnxn.close();
+                        }
+                        cleanupSelectionKey(key);
+                }
+                SocketChannel accepted;
+                while ((accepted = acceptedQueue.poll()) != null) {
+                        fastCloseSock(accepted);
+                }
+                updateQueue.clear();
+        } finally {
+                closeSelector();
+                // This will wake up the accept thread and the other selector
+                // threads, and tell the worker thread pool to begin shutdown.
+                NIOServerCnxnFactory.this.stop();
+                LOG.info(&quot;selector thread exitted run method&quot;);
+        }
+}
+</code></pre>
+<pre><code class="java">private void select() {
+        try {
+                selector.select();
+
+                Set&lt;SelectionKey&gt; selected = selector.selectedKeys();
+                ArrayList&lt;SelectionKey&gt; selectedList =
+                        new ArrayList&lt;SelectionKey&gt;(selected);
+                Collections.shuffle(selectedList);
+                Iterator&lt;SelectionKey&gt; selectedKeys = selectedList.iterator();
+                while(!stopped &amp;&amp; selectedKeys.hasNext()) {
+                        SelectionKey key = selectedKeys.next();
+                        selected.remove(key);
+
+                        if (!key.isValid()) {
+                                cleanupSelectionKey(key);
+                                continue;
+                        }
+                        if (key.isReadable() || key.isWritable()) {
+                                handleIO(key);
+                        } else {
+                                LOG.warn(&quot;Unexpected ops in select &quot; + key.readyOps());
+                        }
+                }
+        } catch (IOException e) {
+                LOG.warn(&quot;Ignoring IOException while selecting&quot;, e);
+        }
+}
+
+</code></pre>
+<pre><code class="java">private void handleIO(SelectionKey key) {
+        IOWorkRequest workRequest = new IOWorkRequest(this, key);
+        NIOServerCnxn cnxn = (NIOServerCnxn) key.attachment();
+
+        // Stop selecting this key while processing on its
+        // connection
+        cnxn.disableSelectable();
+        key.interestOps(0);
+        touchCnxn(cnxn);
+
+        LOG.info(&quot;Selector THread 开始处理　io&quot;);
+        workerPool.schedule(workRequest);
+}
+</code></pre>
+<pre><code class="java">private void processAcceptedConnections() {
+        SocketChannel accepted;
+        while (!stopped &amp;&amp; (accepted = acceptedQueue.poll()) != null) {
+                SelectionKey key = null;
+                try {
+                        // 将　acceptQueue 中的　socketChannel 注册到 selector　并监听读事件
+                        key = accepted.register(selector, SelectionKey.OP_READ);
+                        // 新建　nioServerCnxn 并以附加信息的方式绑定到 selectkey
+                        NIOServerCnxn cnxn = createConnection(accepted, key, this);
+                        key.attach(cnxn);
+                        addCnxn(cnxn);
+                } catch (IOException e) {
+                        // register, createConnection
+                        cleanupSelectionKey(key);
+                        fastCloseSock(accepted);
+                }
+        }
+}
+</code></pre>
+<p>从以上代码可以看出 selectorThread 流程如下:</p>
+<blockquote>
+<ul>
+<li>轮询 selector 选择器上是否有就绪的客户端通道</li>
+<li>当有就绪 Read 事件的客户端通道时　将该客户端派发到 wokerPool 去执行</li>
+<li>当 acceptQueue 队列中有新接收的到客户通道的时候 将其注册到 selector 上并监听 READ 事件；同时并创建一个 NIOServerCnxn 对象绑定到 key 上（待执行 handleIO 时用到）</li>
+</ul>
+</blockquote>
+<p>接下来看下 wokerPool 如何处理 workRequest</p>
+<pre><code class="java">public void schedule(WorkRequest workRequest, long id) {
+        if (stopped) {
+                workRequest.cleanup();
+                return;
+        }
+
+        ScheduledWorkRequest scheduledWorkRequest =
+                new ScheduledWorkRequest(workRequest);
+
+        // If we have a worker thread pool, use that; otherwise, do the work
+        // directly.
+        // 如果　workers 数量大于 0, 则通过　ExecutorService 执行　scheduledWorkRequest；　反之直接调用　ScheduledWorkRequest
+        int size = workers.size();
+        if (size &gt; 0) {
+                try {
+                        // make sure to map negative ids as well to [0, size-1]
+                        int workerNum = ((int) (id % size) + size) % size;
+                        ExecutorService worker = workers.get(workerNum);
+                        worker.execute(scheduledWorkRequest);
+                } catch (RejectedExecutionException e) {
+                        LOG.warn(&quot;ExecutorService rejected execution&quot;, e);
+                        workRequest.cleanup();
+                }
+        } else {
+                // When there is no worker thread pool, do the work directly
+                // and wait for its completion
+                scheduledWorkRequest.start();
+                try {
+                        scheduledWorkRequest.join();
+                } catch (InterruptedException e) {
+                        LOG.warn(&quot;Unexpected exception&quot;, e);
+                        Thread.currentThread().interrupt();
+                }
+        }
+}
+
+</code></pre>
+<pre><code class="java">private class ScheduledWorkRequest extends ZooKeeperThread {
+        private final WorkRequest workRequest;
+
+        ScheduledWorkRequest(WorkRequest workRequest) {
+                super(&quot;ScheduledWorkRequest&quot;);
+                this.workRequest = workRequest;
+        }
+
+        @Override
+        public void run() {
+                try {
+                        // Check if stopped while request was on queue
+                        if (stopped) {
+                                workRequest.cleanup();
+                                return;
+                        }
+                        workRequest.doWork();
+                } catch (Exception e) {
+                        LOG.warn(&quot;Unexpected exception&quot;, e);
+                        workRequest.cleanup();
+                }
+        }
+}
+
+</code></pre>
+<pre><code class="java">private class IOWorkRequest extends WorkerService.WorkRequest {
+        private final SelectorThread selectorThread;
+        private final SelectionKey key;
+        private final NIOServerCnxn cnxn;
+
+        IOWorkRequest(SelectorThread selectorThread, SelectionKey key) {
+                this.selectorThread = selectorThread;
+                this.key = key;
+                this.cnxn = (NIOServerCnxn) key.attachment();
+        }
+
+        public void doWork() throws InterruptedException {
+                if (!key.isValid()) {
+                        selectorThread.cleanupSelectionKey(key);
+                        return;
+                }
+
+                if (key.isReadable() || key.isWritable()) {
+
+                        LOG.info(&quot;IOWorker Request do work &quot;);
+                        cnxn.doIO(key);
+
+                        // Check if we shutdown or doIO() closed this connection
+                        if (stopped) {
+                                cnxn.close();
+                                return;
+                        }
+                        if (!key.isValid()) {
+                                selectorThread.cleanupSelectionKey(key);
+                                return;
+                        }
+                        touchCnxn(cnxn);
+                }
+
+                // Mark this connection as once again ready for selection
+                cnxn.enableSelectable();
+                // Push an update request on the queue to resume selecting
+                // on the current set of interest ops, which may have changed
+                // as a result of the I/O operations we just performed.
+                if (!selectorThread.addInterestOpsUpdateRequest(key)) {
+                        cnxn.close();
+                }
+        }
+
+        @Override
+                public void cleanup() {
+                        cnxn.close();
+                }
+}
+</code></pre>
+<blockquote>
+<p>从上面代码可以看出在执行 IOWorkRequest 时会选择由线程池执行还是单线程执行；最终会由 NIOServerCnxn　处理客户端通道的读写事件</p>
+</blockquote>
+<blockquote>
+<p>综合 AcceptThread SelectorThread IOWorkRequest 可以看出 zookeeper server 的线程模型为单线程的 Reactor模型;如下图所示:</p>
+</blockquote>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm40t5nc2j30m90axdgd.jpg" alt></p>
+<blockquote>
+<p>后续相关的 IO 处理及　PrepRequestProcessor 相关的 Processor 流程会在下文分析</p>
+</blockquote>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;zookeeper</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2017/12/12/zookeeper源码阅读之server/'; 
+            this.page.identifier = '/2017/12/12/zookeeper源码阅读之server/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

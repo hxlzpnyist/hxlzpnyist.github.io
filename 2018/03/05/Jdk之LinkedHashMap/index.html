@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>Jdk之LinkedHashMap ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">Jdk之LinkedHashMap</h1>
+        <p class="text-center"><b>星期一, 三月 5日 2018, 9:29 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h5 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h5><p>LinkedHashMap 与 HashMap 的不同之处在于前者遍历有序，后者遍历无序</p>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fp29qrz3k1j30900f0mxz.jpg" alt></p>
+<p>从上图中可以看出 LinkedHashMap 继承至 HashMap , 并重写了 init, createEntry, addEntry, iterator 等方法。</p>
+<p>同时新增了全局变量 header, 并自定义了 LinkedHashMap.Entry 内部类<br><a id="more"></a></p>
+<pre><code class="java">private static class Entry&lt;K,V&gt; extends HashMap.Entry&lt;K,V&gt; {
+        // These fields comprise the doubly linked list used for iteration.
+        Entry&lt;K,V&gt; before, after;
+
+        Entry(int hash, K key, V value, HashMap.Entry&lt;K,V&gt; next) {
+            super(hash, key, value, next);
+        }
+
+        /**
+         * Removes this entry from the linked list.
+         */
+        private void remove() {
+            before.after = after;
+            after.before = before;
+        }
+
+        /**
+         * Inserts this entry before the specified existing entry in the list.
+         */
+        private void addBefore(Entry&lt;K,V&gt; existingEntry) {
+            after  = existingEntry;
+            before = existingEntry.before;
+            before.after = this;
+            after.before = this;
+        }
+
+    }
+
+</code></pre>
+<p>从代码中可以看出 LinkedHashMap.Entry 继承至 HashMap.Entry ,　新增了变量 before, after; 以及内部方法 addBefore;</p>
+<p>那么 LinkedHashMap 如何保证遍历有序的呢？下文将详细说明，首先我们先看下 LinkedHashMap 的初始化操作有何不同。</p>
+<h6 id="init"><a href="#init" class="headerlink" title="init"></a>init</h6><pre><code class="java">    void init() {
+        header = new Entry&lt;&gt;(-1, null, null, null);
+        header.before = header.after = header;
+    }
+</code></pre>
+<p>在初始化过程中 构建了 header 节点</p>
+<h6 id="createEntry"><a href="#createEntry" class="headerlink" title="createEntry"></a>createEntry</h6><pre><code class="java">    /**
+     * This override differs from addEntry in that it doesn&#39;t resize the
+     * table or remove the eldest entry.
+     */
+    void createEntry(int hash, K key, V value, int bucketIndex) {
+        HashMap.Entry&lt;K,V&gt; old = table[bucketIndex];
+        Entry&lt;K,V&gt; e = new Entry&lt;&gt;(hash, key, value, old);
+        table[bucketIndex] = e;
+        e.addBefore(header);
+        size++;
+    }
+</code></pre>
+<p>从代码中可以看出与 HashMap 不同之处在于 构建 Entry 实例之后执行了 e.addBefore 方法</p>
+<pre><code class="java">    private void addBefore(Entry&lt;K,V&gt; existingEntry) {
+            // 当前节点的后驱节点指向 existingEntry
+            after  = existingEntry;
+            // 当前节点的前驱节点指向 existingEntry 的后驱节点
+            before = existingEntry.before;
+            // 当前节点的前驱节点的后驱节点指向当前节点
+            before.after = this;
+            // 当前节点的后驱节点的前驱节点指向当前节点
+            after.before = this;
+        }
+</code></pre>
+<p>从init, Entry.addBefore 方法可以看出 LinkedHashMap 内部维护了一个”双向链表”，每次添加元素的时候会将该节点添加到链表中；如下图所示：</p>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fp2baen2gdj30ul0h7qv5.jpg" alt></p>
+<h6 id="iterator"><a href="#iterator" class="headerlink" title="iterator"></a>iterator</h6><pre><code class="java">private abstract class LinkedHashIterator&lt;T&gt; implements Iterator&lt;T&gt; {
+        Entry&lt;K,V&gt; nextEntry    = header.after;
+        Entry&lt;K,V&gt; lastReturned = null;
+
+        /**
+         * The modCount value that the iterator believes that the backing
+         * List should have.  If this expectation is violated, the iterator
+         * has detected concurrent modification.
+         */
+        int expectedModCount = modCount;
+
+        public boolean hasNext() {
+            // 当 nextEntry 不等于 header 的表示还未遍历到链表末尾
+            return nextEntry != header;
+        }
+
+        public void remove() {
+            if (lastReturned == null)
+                throw new IllegalStateException();
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+
+            LinkedHashMap.this.remove(lastReturned.key);
+            lastReturned = null;
+            expectedModCount = modCount;
+        }
+
+        Entry&lt;K,V&gt; nextEntry() {
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+            if (nextEntry == header)
+                throw new NoSuchElementException();
+
+            Entry&lt;K,V&gt; e = lastReturned = nextEntry;
+            // 指向节点的后驱节点
+            nextEntry = e.after;
+            return e;
+        }
+    }
+</code></pre>
+<p>从内部类 LinkedHashIterator 中可以看出 LinkedHashMap 是遍历双向链表，从而保证遍历的时候有序.</p>
+<p>同样 LinkedHashSet 内部是调用 LinkedHashMap 实现，同样也保证了遍历有序。</p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/03/05/Jdk之LinkedHashMap/'; 
+            this.page.identifier = '/2018/03/05/Jdk之LinkedHashMap/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

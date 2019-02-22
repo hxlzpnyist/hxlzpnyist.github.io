@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>Jdk之AbstractQueuedSynchronizer源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">Jdk之AbstractQueuedSynchronizer源码分析</h1>
+        <p class="text-center"><b>星期五, 一月 5日 2018, 6:56 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h5 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h5><blockquote>
+<p>队列同步器 (AbstractQueuedSynchronizer) 是用来构建锁或其他同步组件的基础框架，使用了一个 int 成员变量表示同步状态,　通过内置的 FIFO 队列来完成资源获取线程的排队工作。</p>
+</blockquote>
+<h6 id="定义"><a href="#定义" class="headerlink" title="定义"></a>定义</h6><pre><code class="java">public abstract class AbstractQueuedSynchronizer
+    extends AbstractOwnableSynchronizer
+    implements java.io.Serializable {
+
+    protected AbstractQueuedSynchronizer() { }
+
+    /**
+     * 同步队列头结点
+     */
+    private transient volatile Node head;
+
+    /**
+     * 同步队列尾节点
+     */
+    private transient volatile Node tail;
+
+    /**
+     * 同步状态
+     */
+    private volatile int state;
+}
+</code></pre>
+<a id="more"></a>
+<blockquote>
+<p>内置队列节点定义如下:</p>
+</blockquote>
+<pre><code class="java">static final class Node {
+        /** waitStatus value to indicate thread has cancelled */
+        static final int CANCELLED =  1;
+        /** waitStatus value to indicate successor&#39;s thread needs unparking */
+        static final int SIGNAL    = -1;
+        /** waitStatus value to indicate thread is waiting on condition */
+        static final int CONDITION = -2;
+        /**
+         * waitStatus value to indicate the next acquireShared should
+         * unconditionally propagate
+         */
+        static final int PROPAGATE = -3;
+
+        /**
+         * 节点等待状态
+         */
+        volatile int waitStatus;
+
+        /**
+         * 节点的前置节点
+         */
+        volatile Node prev;
+
+        /**
+          * 节点的后置节点
+         */
+        volatile Node next;
+
+        /**
+         * 绑定节点对应的线程 
+         */
+        volatile Thread thread;
+
+        /**
+         *
+         */
+        Node nextWaiter;
+
+        /**
+         * Returns true if node is waiting in shared mode
+         */
+        final boolean isShared() {
+            return nextWaiter == SHARED;
+        }
+
+        /**
+         */
+        final Node predecessor() throws NullPointerException {
+            Node p = prev;
+            if (p == null)
+                throw new NullPointerException();
+            else
+                return p;
+        }
+    }
+</code></pre>
+<p>从 Node 的定义可以看出 AQS 内置的是一个双向队列，当线程获取锁失败的时候同步器会将当前线程及等待状态构造成一个节点加入到同步队列中。</p>
+<blockquote>
+<p>等待状态 waitStatus 取值范围如下：</p>
+</blockquote>
+<ul>
+<li>CANCELLED = 1; 说明由于同步队列中等待的线程等待超时或被中断，需要取消等待</li>
+<li>SIGNAL = -1; 等待触发状态，同时该节点的后继节点的线程处于等待状态，当前节点的线程如果释放了锁,将会唤醒后继节点</li>
+<li>INITIAL = 0; 初始状态</li>
+</ul>
+<h5 id="独占模式"><a href="#独占模式" class="headerlink" title="独占模式"></a>独占模式</h5><pre><code>独占模式下允许当前只有一个线程获取锁。
+</code></pre><h6 id="获取锁"><a href="#获取锁" class="headerlink" title="获取锁"></a>获取锁</h6><blockquote>
+<p>通过调用同步器的 acquire(int args) 方法获取锁, 该方法对中断不敏感，也就是当线程获取锁失败后加入同步队列中，后续对线程进行中断操作时，线程不会从队列中移除。</p>
+</blockquote>
+<pre><code class="java">public final void acquire(int arg) {
+    if (!tryAcquire(arg) &amp;&amp; acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+        selfInterrupt();
+}
+</code></pre>
+<p>获取锁的主要逻辑如下：</p>
+<ul>
+<li>调用自定义实现 tryAcquire(arg) 方法, 尝试获取锁；如果获取锁失败则往下执行</li>
+<li>addWaiter 以独占模式构造同步节点并将其添加到同步队列尾部</li>
+<li>acquireQueued 让该节点以“死循环”的方式尝试再次获取锁，如果获取失败则将该节点对应的线程挂起，等待前置节点的唤醒</li>
+</ul>
+<pre><code class="java">    private Node addWaiter(Node mode) {
+        // 将当前线程以独占模式创建同步节点
+        Node node = new Node(Thread.currentThread(), mode);
+        // 当前队列的尾节点为新增节点的前置节点
+        Node pred = tail;
+        if (pred != null) { // 前置节点不为空　说明同步队列已经初始化
+            // 将新增节点的前置节点指向 pred
+            node.prev = pred;
+            // 将同步队列的尾节点移动指向新增的节点
+            if (compareAndSetTail(pred, node)) {
+                // 将 pred 的后置节点指向新增的节点 并返回
+                pred.next = node;
+                return node;
+            }
+        }
+        // enq 完成同步队列的初始化 并将新增节点加入队列中
+        enq(node);
+        return node;
+    }
+</code></pre>
+<pre><code class="java">    private Node enq(final Node node) {
+        for (;;) {
+            Node t = tail;
+            // 判断尾节点是否为空
+            if (t == null) { 
+                // 执行同步队列的初始化
+                // 创建头节点
+                // 将 head tail 分别指向队列头节点
+                if (compareAndSetHead(new Node()))
+                    tail = head;
+            } else {
+                // 将 node 的前置节点指向尾节点
+                node.prev = t;
+                // 将 tail 移动指向 node, 并将 t 的后置节点指向 node
+                if (compareAndSetTail(t, node)) {
+                    t.next = node;
+                    return t;
+                }
+            }
+        }
+    }
+</code></pre>
+<p>从 enq 方法可以看出, 同步器通过”死循环”来保证节点的正确添加，只有通过CAS将节点设置为尾节点，当前线程才能返回；否则不断尝试设置。</p>
+<pre><code class="java">final boolean acquireQueued(final Node node, int arg) {
+        boolean failed = true;
+        try {
+            boolean interrupted = false;
+            for (;;) {
+                // 获取节点的前置节点
+                final Node p = node.predecessor();
+                // 如果前置节点为 head 节点，并且再次尝试获取锁成功
+                if (p == head &amp;&amp; tryAcquire(arg)) {
+                    // 将 node 设为头节点
+                    setHead(node);
+                    p.next = null; // help GC
+                    failed = false;
+                    return interrupted;
+                }
+                // 获取锁失败后 将当前线程挂起
+                // shouldParkAfterFailedAcquire 判断当前线程是否支持挂起
+                // parkAndCHeckInterrupt 将当前线程挂起,　并检测是否中断
+                if (shouldParkAfterFailedAcquire(p, node) &amp;&amp;
+                    parkAndCheckInterrupt())
+                    interrupted = true;
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+</code></pre>
+<pre><code class="java">private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
+        int ws = pred.waitStatus;
+        if (ws == Node.SIGNAL)
+            // 只有当前置节点的等待状态为触发状态(-1)时返回　允许后置节点挂起
+            return true;
+        if (ws &gt; 0) {
+            do {
+                node.prev = pred = pred.prev;
+            } while (pred.waitStatus &gt; 0);
+            pred.next = node;
+        } else {
+               // 将前置节点的等待状态改为 -1 
+            compareAndSetWaitStatus(pred, ws, Node.SIGNAL);
+        }
+        return false;
+    }
+</code></pre>
+<pre><code class="java">private final boolean parkAndCheckInterrupt() {
+        // 将线程挂起
+        LockSupport.park(this);
+        return Thread.interrupted();
+    }
+</code></pre>
+<p>从 acquireQueued 方法中可以看出，节点进入同步队列之后以“自轮询”的方式再满足条件的情况下（前置节点为头节点）再次尝试获取锁，如果获取成功则将自己设置为头节点并退出“自轮询”的过程；如果获取失败则将自己当前线程挂起阻塞等待被唤醒以此类推执行“自轮询”的过程。</p>
+<h6 id="释放锁"><a href="#释放锁" class="headerlink" title="释放锁"></a>释放锁</h6><pre><code class="java">public final boolean release(int arg) {
+        if (tryRelease(arg)) {
+            Node h = head;
+            if (h != null &amp;&amp; h.waitStatus != 0)
+                unparkSuccessor(h);
+            return true;
+        }
+        return false;
+    }
+</code></pre>
+<pre><code class="java">private void unparkSuccessor(Node node) {
+
+        int ws = node.waitStatus;
+        if (ws &lt; 0)
+            // 将头节点的等待状态改为 0
+            compareAndSetWaitStatus(node, ws, 0);
+
+        // 获取后置节点
+        Node s = node.next;
+        if (s == null || s.waitStatus &gt; 0) {
+            s = null;
+            for (Node t = tail; t != null &amp;&amp; t != node; t = t.prev)
+                if (t.waitStatus &lt;= 0)
+                    s = t;
+        }
+        if (s != null)
+            // 唤醒后置节点对应的线程
+            LockSupport.unpark(s.thread);
+    }
+</code></pre>
+<p>关于节点自轮询及节点释放锁后队列的变化如下图所示：</p>
+<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fn6w19xhekj30xj0oetal.jpg" alt></p>
+<h5 id="共享模式"><a href="#共享模式" class="headerlink" title="共享模式"></a>共享模式</h5><pre><code>共享模式表示同一时刻允许多个线程获取锁
+</code></pre><h6 id="获取锁-1"><a href="#获取锁-1" class="headerlink" title="获取锁"></a>获取锁</h6><pre><code class="java">    public final void acquireShared(int arg) {
+        if (tryAcquireShared(arg) &lt; 0)
+            doAcquireShared(arg);
+    }
+</code></pre>
+<p>tryAcquireShared(arg) 尝试获取共享锁，返回结果 &gt;= 0 表示获取锁成功；反之获取锁失败,　调用 doAcquireShared(arg) </p>
+<pre><code class="java">private void doAcquireShared(int arg) {
+        final Node node = addWaiter(Node.SHARED);
+        boolean failed = true;
+        try {
+            boolean interrupted = false;
+            for (;;) {
+                final Node p = node.predecessor();
+                if (p == head) {
+                    int r = tryAcquireShared(arg);
+                    if (r &gt;= 0) {
+                        setHeadAndPropagate(node, r);
+                        p.next = null; // help GC
+                        if (interrupted)
+                            selfInterrupt();
+                        failed = false;
+                        return;
+                    }
+                }
+                if (shouldParkAfterFailedAcquire(p, node) &amp;&amp;
+                    parkAndCheckInterrupt())
+                    interrupted = true;
+            }
+        } finally {
+            if (failed)
+                cancelAcquire(node);
+        }
+    }
+</code></pre>
+<p>从 doAcquireShared 方法中可以看出共享模式下节点加入同步队列以及”自轮询”的过程与独占模式下基本类似，不同之处在于当节点尝试获取锁成功后的处理逻辑 setHeadAndPropagate</p>
+<pre><code class="java">private void setHeadAndPropagate(Node node, int propagate) {
+        Node h = head; // Record old head for check below
+        setHead(node);
+
+        if (propagate &gt; 0 || h == null || h.waitStatus &lt; 0) {
+            Node s = node.next;
+            if (s == null || s.isShared())
+                doReleaseShared();
+        }
+    }
+</code></pre>
+<p>从代码中可以看出在节点获取锁成功后会判断后置节点是否为共享模式，如果为共享模式则对其进行唤醒操作，也就是同时激发多个线程并发的运行</p>
+<h6 id="释放锁-1"><a href="#释放锁-1" class="headerlink" title="释放锁"></a>释放锁</h6>
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/01/05/Jdk之AbstractQueuedSynchronizer源码分析/'; 
+            this.page.identifier = '/2018/01/05/Jdk之AbstractQueuedSynchronizer源码分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

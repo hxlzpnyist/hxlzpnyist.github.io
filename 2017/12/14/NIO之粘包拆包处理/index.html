@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>NIO之粘包拆包处理 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">NIO之粘包拆包处理</h1>
+        <p class="text-center"><b>星期四, 十二月 14日 2017, 2:48 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h4 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h4><blockquote>
+<p>我们都知道TCP属于传输层的协议，传输层除了有TCP协议外还有UDP协议。那么UDP是否会发生粘包或拆包的现象呢？答案是不会。UDP是基于报文发送的，从UDP的帧结构可以看出，在UDP首部采用了16bit来指示UDP数据报文的长度，因此在应用层能很好的将不同的数据报文区分开，从而避免粘包和拆包的问题。而TCP是基于字节流的，虽然应用层和TCP传输层之间的数据交互是大小不等的数据块，但是TCP把这些数据块仅仅看成一连串无结构的字节流，没有边界；另外从TCP的帧结构也可以看出，在TCP的首部没有表示数据长度的字段，基于上面两点，在使用TCP传输数据时，才有粘包或者拆包现象发生的可能。</p>
+</blockquote>
+<h4 id="粘包拆包的原因"><a href="#粘包拆包的原因" class="headerlink" title="粘包拆包的原因"></a>粘包拆包的原因</h4><blockquote>
+<p>关于 tcp 传输过程中，发生粘包拆包的原因及表现形式可参考网上的一篇<a href="https://blog.insanecoder.top/tcp-packet-splice-and-split-issue/" target="_blank" rel="noopener">博客</a>; 这里就不在说明.</p>
+</blockquote>
+<h4 id="粘包拆包的解决方法"><a href="#粘包拆包的解决方法" class="headerlink" title="粘包拆包的解决方法"></a>粘包拆包的解决方法</h4><blockquote>
+<p>本文给出针对自定义消息报文格式，通过在消息头部添加消息载体长度来处理<br><a id="more"></a></p>
+</blockquote>
+<h5 id="实现方式"><a href="#实现方式" class="headerlink" title="实现方式"></a>实现方式</h5><h6 id="消息内容包装"><a href="#消息内容包装" class="headerlink" title="消息内容包装"></a>消息内容包装</h6><pre><code class="java">public class PacketWrapper {
+
+        // 消息有效长度
+        private int length;
+        // 消息的有效载体
+        private byte[] payload;
+
+        public PacketWrapper(String payload) {
+                this.payload = payload.getBytes();
+                this.length = this.payload.length;
+        }
+
+        public PacketWrapper(byte[] payload) {
+                this.payload = payload;
+                this.length = this.payload.length;
+        }
+
+        // 返回包装后的字节数组
+        public byte[] getBytes() {
+                ByteBuffer byteBuffer = ByteBuffer.allocate(this.length + 4);
+                byteBuffer.putInt(this.length);
+                byteBuffer.put(payload);
+                return byteBuffer.array();
+        }
+
+        public String toString() {
+                StringBuilder sb = new StringBuilder();
+                for (byte b : getBytes()) {
+                        sb.append(String.format(&quot;0x%02X &quot;, b));
+                }
+                return sb.toString();
+        }
+}
+
+</code></pre>
+<h6 id="消息报文的解码"><a href="#消息报文的解码" class="headerlink" title="消息报文的解码"></a>消息报文的解码</h6><pre><code class="java">
+public class NioDecodeHandler {
+
+    private static Logger log = Logger.getLogger(NioDecodeHandler.class);
+
+    private final int HEAD_LENGTH = 4;
+
+    protected ByteBuffer lastReadBuffer = null;
+
+    public void decode (SocketChannel socketChannel) {
+        // 从通道中读取内容
+        ByteBuffer readByteBuffer = ByteBuffer.allocate(128);
+        try {
+            int read = socketChannel.read(readByteBuffer);
+            if (read &lt; 0) {
+                throw new RuntimeException(&quot;&quot;);
+            }
+        } catch (IOException e) {
+
+        }
+
+        ByteBuffer newByteBuffer = readByteBuffer;
+        if (newByteBuffer == null) {
+            return;
+        }
+        // 切换到读模式
+        newByteBuffer.flip();
+
+        if (lastReadBuffer != null) {
+            // 将上次遗留的数据与本次已读的数据合并
+            newByteBuffer = ByteBufferUtil.composite(lastReadBuffer, newByteBuffer);
+        }
+
+        decode : while (true) {
+            if (newByteBuffer.remaining() &lt;= HEAD_LENGTH) {
+                // 报文字节数达不到报文长度退出
+                lastReadBuffer = ByteBuffer.wrap(ByteBufferUtil.readBuffer(newByteBuffer, newByteBuffer.remaining()));
+                return;
+            }
+
+            // 获取报文头部, 即报文有效长度
+            int payloadLength = newByteBuffer.getInt();
+            if (newByteBuffer.remaining() &lt; payloadLength) {
+                // 拆包 : 后续字节不够一个完整报文
+                // 因上一操作 getInt 读取了 4　字节, 故需将　position 退回移动 4　字节
+                newByteBuffer.position(newByteBuffer.position() - HEAD_LENGTH);
+                lastReadBuffer = ByteBuffer.wrap(ByteBufferUtil.readBuffer(newByteBuffer, newByteBuffer.remaining()));
+                return;
+            }
+
+            // 获取有效报文
+            handlerPacket(socketChannel, ByteBufferUtil.readBuffer(newByteBuffer, payloadLength));
+
+            if (newByteBuffer.remaining() &gt; 0) {
+                // 剩下的报文 可能是有效报文,　继续解码
+                continue decode;
+            }
+
+            return;
+        }
+    }
+
+
+
+    private void handlerPacket (SocketChannel socketChannel, byte[] packet) {
+        ServiceLoader&lt;PacketHandler&gt; packetHandlers = ServiceLoader.load(PacketHandler.class);
+        Iterator&lt;PacketHandler&gt; packetHandlerIterator = packetHandlers.iterator();
+
+        while (packetHandlerIterator.hasNext()) {
+            packetHandlerIterator.next().handler(socketChannel, packet);
+        }
+    }
+
+}
+
+</code></pre>
+<p>依赖的工具方法如下：</p>
+<pre><code class="java">
+public class ByteBufferUtil {
+
+    private ByteBufferUtil () {}
+
+    /**
+     * 将两个 bytebuffer 合并
+     *
+     * @param byteBuffer1
+     * @param byteBuffer2
+     * @return
+     */
+    public static ByteBuffer composite(ByteBuffer byteBuffer1, ByteBuffer byteBuffer2) {
+        int capacity = byteBuffer1.limit() - byteBuffer1.position() + byteBuffer2.limit() - byteBuffer2.position();
+        ByteBuffer ret = ByteBuffer.allocate(capacity);
+
+        ret.put(byteBuffer1);
+        ret.put(byteBuffer2);
+
+        ret.position(0);
+        ret.limit(ret.capacity());
+        return ret;
+    }
+
+    /**
+     * 获取 bytebuffer 中可读的内容
+     *
+     * @param byteBuffer
+     * @param size
+     * @return
+     */
+    public static byte[] readBuffer(ByteBuffer byteBuffer, int size) {
+        byte[] bytes = new byte[size];
+
+        byteBuffer.get(bytes);
+
+        return bytes;
+    }
+}
+
+</code></pre>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;NIO</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2017/12/14/NIO之粘包拆包处理/'; 
+            this.page.identifier = '/2017/12/14/NIO之粘包拆包处理/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>
