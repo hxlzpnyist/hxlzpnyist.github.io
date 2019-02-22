@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>AQS 之 Condition-的源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">AQS 之 Condition-的源码分析</h1>
+        <p class="text-center"><b>星期三, 十二月 5日 2018, 4:09 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <blockquote>
+<p>在使用 Lock 锁的过程中，我们往往会使用到另外一个对象 Condition ，用于等待/通知模式的处理。</p>
+</blockquote>
+<h4 id="Condition-的创建"><a href="#Condition-的创建" class="headerlink" title="Condition 的创建"></a>Condition 的创建</h4><pre><code class="java">    Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+</code></pre>
+<p>使用 Condition 的前提是获取锁</p>
+<pre><code class="java">final ConditionObject newCondition() {
+    return new ConditionObject();
+}
+</code></pre>
+<p>从 newCondition 方法看出 Condition 对象实际上是 AQS 的内部类 ConditionObject ()。</p>
+<h4 id="成员变量"><a href="#成员变量" class="headerlink" title="成员变量"></a>成员变量</h4><pre><code class="java">/** First node of condition queue. */
+private transient Node firstWaiter;
+/** Last node of condition queue. */
+private transient Node lastWaiter;
+</code></pre>
+<p>从内部定义的变量 firstWaiter, lastWaiter 看出， ConditionObject 对象内部维护了一个同样以 Node 为节点的等待队列。</p>
+<h4 id="await"><a href="#await" class="headerlink" title="await()"></a>await()</h4><blockquote>
+<p>await 操作会使当前线程释放锁并进入等待模式。</p>
+</blockquote>
+<pre><code class="java">public final void await() throws InterruptedException {
+    if (Thread.interrupted())
+        // 当前线程中断 抛出中断异常
+        throw new InterruptedException();
+    // 将当前线程构造节点插入等待队列尾部
+    Node node = addConditionWaiter();
+    // 当前线程释放锁，唤醒同步队列 head 的后置节点
+    int savedState = fullyRelease(node);
+    int interruptMode = 0;
+    // 节点添加到同步队列后 退出循环
+    while (!isOnSyncQueue(node)) {
+        LockSupport.park(this);
+        // 应该是在其他线程释放锁后被唤醒
+        // 检查当前线程是否中断，若未中断则返回 0
+        if ((interruptMode = checkInterruptWhileWaiting(node)) != 0)
+            break;
+    }
+    // node 进入自旋过程尝试获取锁
+    if (acquireQueued(node, savedState) &amp;&amp; interruptMode != THROW_IE)
+        interruptMode = REINTERRUPT;
+    if (node.nextWaiter != null) // clean up if cancelled
+        unlinkCancelledWaiters();
+    if (interruptMode != 0)
+        reportInterruptAfterWait(interruptMode);
+}
+</code></pre>
+<pre><code class="java">private Node addConditionWaiter() {
+    Node t = lastWaiter;
+    // If lastWaiter is cancelled, clean out.
+    if (t != null &amp;&amp; t.waitStatus != Node.CONDITION) {
+        // 移除等待队列中状态非 CONDITION 的节点
+        unlinkCancelledWaiters();
+        t = lastWaiter;
+    }
+    // 将当前线程构造节点并设置状态为 CONDITION
+    Node node = new Node(Thread.currentThread(), Node.CONDITION);
+    if (t == null)
+        // 等待队列为空的时候将 firstWaiter 指向 node
+        firstWaiter = node;
+    else
+        // 等待队列非空时将 lastWaiter 尾节点的 nextWaiter 指向 node
+        t.nextWaiter = node;
+    // 移动尾节点
+    lastWaiter = node;
+    return node;
+}
+</code></pre>
+<pre><code class="java">final int fullyRelease(Node node) {
+    boolean failed = true;
+    try {
+        int savedState = getState();
+        // 当前线程释放锁，并唤醒同步队列中 head 的后置节点
+        if (release(savedState)) {
+            failed = false;
+            return savedState;
+        } else {
+            throw new IllegalMonitorStateException();
+        }
+    } finally {
+        if (failed)
+            node.waitStatus = Node.CANCELLED;
+    }
+}
+</code></pre>
+<pre><code class="java">// 判断节点是否在同步队列上
+final boolean isOnSyncQueue(Node node) {
+    // 节点状态为 CONDITION 或 节点的前置为空 说明节点还在等待队列上
+    if (node.waitStatus == Node.CONDITION || node.prev == null)
+        return false;
+    // 如果节点存在后置节点 next 则说明节点在同步队列上
+    if (node.next != null) // If has successor, it must be on queue
+        return true;
+    /*
+     * node.prev can be non-null, but not yet on queue because
+     * the CAS to place it on queue can fail. So we have to
+     * traverse from tail to make sure it actually made it.  It
+     * will always be near the tail in calls to this method, and
+     * unless the CAS failed (which is unlikely), it will be
+     * there, so we hardly ever traverse much.
+     */
+    // 从 tail 尾节点开始遍历同步队列查找 node 节点；若存在返回 true,反之返回 false
+    return findNodeFromTail(node);
+}
+</code></pre>
+<p>await 操作流程如下 ：</p>
+<ul>
+<li>将当前线程构造一个新的 node 节点，状态为 CONDITION 添加到等待队列尾部</li>
+<li>释放锁，唤醒同步队列 head 的后置节点</li>
+<li>判断当前 node 节点是否在同步队列中，若不在同步队列上则挂起当前线程，等待其他线程释放锁时被唤醒</li>
+<li>节点 node 被唤醒后若在同步队列上，则进入自旋过程再次尝试获取锁</li>
+</ul>
+<h4 id="signal"><a href="#signal" class="headerlink" title="signal()"></a>signal()</h4><blockquote>
+<p>signal 操作激活等待队列中节点</p>
+</blockquote>
+<pre><code class="java">public final void signal() {
+    // 判断当前线程是否为锁的持有者
+    if (!isHeldExclusively())
+        throw new IllegalMonitorStateException();
+    Node first = firstWaiter;
+    if (first != null)
+        doSignal(first);
+}
+</code></pre>
+<pre><code class="java">private void doSignal(Node first) {
+    do {
+        // 判断 first 的后置节点是否为空，为空说明等待队列为空
+        if ( (firstWaiter = first.nextWaiter) == null)
+            // 等待队列的尾节点置为空
+            lastWaiter = null;
+        // 将 first 的后置节点置为空，也即是将 first 节点从等待队列中移除
+        first.nextWaiter = null;
+
+        // 执行信号转移
+    } while (!transferForSignal(first) &amp;&amp;
+             (first = firstWaiter) != null);
+}
+</code></pre>
+<pre><code class="java">// 将节点从等待队列 (condition queue) 转移到 同步队列 (sync queue)
+final boolean transferForSignal(Node node) {
+    /*
+     * If cannot change waitStatus, the node has been cancelled.
+     */
+    // 将节点状态设置为 0
+    if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+        return false;
+
+    /*
+     * Splice onto queue and try to set waitStatus of predecessor to
+     * indicate that thread is (probably) waiting. If cancelled or
+     * attempt to set waitStatus fails, wake up to resync (in which
+     * case the waitStatus can be transiently and harmlessly wrong).
+     */
+    // 将节点添加到同步队列(sync queue)尾部， 此时 p 应该是 node 的前置节点 ws 为 0
+    Node p = enq(node);
+    // 
+    int ws = p.waitStatus;
+    // 将 node 的前置节点状态改为 SIGNAL; 便于节点 p 释放锁的时候唤醒 node
+    if (ws &gt; 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+        LockSupport.unpark(node.thread);
+    return true;
+    }
+</code></pre>
+<p>signal 操作的流程如下：</p>
+<ul>
+<li>将等待队列中的节点从队列中移除</li>
+<li>将等待队列中的节点状态由 CONDITION 改为 0</li>
+<li>将等待队列中的节点添加到 AQS 的同步队列尾部</li>
+</ul>
+<blockquote>
+<p>signal 的作用 只是将节点从等待队列转移到同步队列中，只有当前线程释放锁后，转移到同步队列的节点才会有机会获取到锁。</p>
+</blockquote>
+<p>如下图所示为 Condition 操作节点的转移过程：</p>
+<p><img src="https://user-gold-cdn.xitu.io/2018/12/14/167acc5c97a7b8a1?w=1066&amp;h=1113&amp;f=png&amp;s=82729" alt></p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>从 Condition 的 await()、signal() 操作可以看出，其作用等效于 Object 对象的 await(), notify() 方法； </p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;多线程</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/12/05/AQS 之 Condition/'; 
+            this.page.identifier = '/2018/12/05/AQS 之 Condition/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

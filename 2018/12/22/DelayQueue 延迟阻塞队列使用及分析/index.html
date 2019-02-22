@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>DelayQueue 延迟阻塞队列使用及分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">DelayQueue 延迟阻塞队列使用及分析</h1>
+        <p class="text-center"><b>星期六, 十二月 22日 2018, 4:09 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h3 id="延迟阻塞队列-DelayQueue"><a href="#延迟阻塞队列-DelayQueue" class="headerlink" title="延迟阻塞队列 DelayQueue"></a>延迟阻塞队列 DelayQueue</h3><blockquote>
+<p>DelayQueue 是一个支持延时获取元素的阻塞队列， 内部采用优先队列 PriorityQueue 存储元素，同时元素必须实现 Delayed 接口；在创建元素时可以指定多久才可以从队列中获取当前元素，只有在延迟期满时才能从队列中提取元素。</p>
+</blockquote>
+<h3 id="使用场景"><a href="#使用场景" class="headerlink" title="使用场景"></a>使用场景</h3><blockquote>
+<p>因延迟阻塞队列的特性， 我们一般将 DelayQueue 作用于以下场景 ：</p>
+</blockquote>
+<ul>
+<li>缓存系统 ： 当能够从 DelayQueue 中获取元素时，说该缓存已过期</li>
+<li><p>定时任务调度 ：</p>
+<p>下面我们以缓存系统的应用，看下 DelayQueue 的使用，代码如下：</p>
+</li>
+</ul>
+<pre><code class="java">public class DelayQueueDemo {
+
+    static class Cache implements Runnable {
+
+        private boolean stop = false;
+
+        private Map&lt;String, String&gt; itemMap = new HashMap&lt;&gt;();
+
+        private DelayQueue&lt;CacheItem&gt; delayQueue = new DelayQueue&lt;&gt;();
+
+        public Cache () {
+            // 开启内部线程检测是否过期
+            new Thread(this).start();
+        }
+
+        /**
+         * 添加缓存
+         *
+         * @param key
+         * @param value
+         * @param exprieTime　过期时间,单位秒
+         */
+        public void put (String key, String value, long exprieTime) {
+            CacheItem cacheItem = new CacheItem(key, exprieTime);
+
+            // 此处忽略添加重复 key 的处理
+            delayQueue.add(cacheItem);
+            itemMap.put(key, value);
+        }
+
+        public String get (String key) {
+            return itemMap.get(key);
+        }
+
+        public void shutdown () {
+            stop = true;
+        }
+
+        @Override
+        public void run() {
+            while (!stop) {
+                CacheItem cacheItem = delayQueue.poll();
+                if (cacheItem != null) {
+                    // 元素过期, 从缓存中移除
+                    itemMap.remove(cacheItem.getKey());
+                    System.out.println(&quot;key : &quot; + cacheItem.getKey() + &quot; 过期并移除&quot;);
+                }
+            }
+
+            System.out.println(&quot;cache stop&quot;);
+        }
+    }
+
+    static class CacheItem implements Delayed {
+
+        private String key;
+
+        /**
+         * 过期时间(单位秒)
+         */
+        private long exprieTime;
+
+        private long currentTime;
+
+        public CacheItem(String key, long exprieTime) {
+            this.key = key;
+            this.exprieTime = exprieTime;
+            this.currentTime = System.currentTimeMillis();
+        }
+
+        @Override
+        public long getDelay(TimeUnit unit) {
+            // 计算剩余的过期时间
+            // 大于 0 说明未过期
+            return exprieTime - TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - currentTime);
+        }
+
+        @Override
+        public int compareTo(Delayed o) {
+            // 过期时间长的放置在队列尾部
+            if (this.getDelay(TimeUnit.MICROSECONDS) &gt; o.getDelay(TimeUnit.MICROSECONDS)) {
+                return 1;
+            }
+            // 过期时间短的放置在队列头
+            if (this.getDelay(TimeUnit.MICROSECONDS) &lt; o.getDelay(TimeUnit.MICROSECONDS)) {
+                return -1;
+            }
+
+            return 0;
+        }
+
+        public String getKey() {
+            return key;
+        }
+    }
+
+    public static void main(String[] args) throws InterruptedException {
+
+        Cache cache = new Cache();
+
+        // 添加缓存元素
+        cache.put(&quot;a&quot;, &quot;1&quot;, 5);
+        cache.put(&quot;b&quot;, &quot;2&quot;, 4);
+        cache.put(&quot;c&quot;, &quot;3&quot;, 3);
+
+        while (true) {
+            String a = cache.get(&quot;a&quot;);
+            String b = cache.get(&quot;b&quot;);
+            String c = cache.get(&quot;c&quot;);
+
+            System.out.println(&quot;a : &quot; + a + &quot;, b : &quot; + b + &quot;, c : &quot; + c);
+
+            // 元素均过期后退出循环
+            if (StringUtils.isEmpty(a) &amp;&amp; StringUtils.isEmpty(b) &amp;&amp; StringUtils.isEmpty(c)) {
+                break;
+            }
+
+            TimeUnit.MILLISECONDS.sleep(1000);
+        }
+
+        cache.shutdown();
+    }
+}
+
+</code></pre>
+<p>执行结果如下：</p>
+<pre><code class="java">
+a : 1, b : 2, c : 3
+a : 1, b : 2, c : 3
+a : 1, b : 2, c : 3
+key : c 过期并移除
+a : 1, b : 2, c : null
+key : b 过期并移除
+a : 1, b : null, c : null
+key : a 过期并移除
+a : null, b : null, c : null
+cache stop
+
+</code></pre>
+<p>从执行结果可以看出，因循环内部每次停顿 1 秒，当等待 3 秒后，元素 c 过期并从缓存中清除，等待 4 秒后，元素 b 过期并从缓存中清除，等待 5 秒后，元素 a 过期并从缓存中清除。</p>
+<h3 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h3><h4 id="变量"><a href="#变量" class="headerlink" title="变量"></a>变量</h4><h5 id="重入锁"><a href="#重入锁" class="headerlink" title="重入锁"></a>重入锁</h5><pre><code class="java">private final transient ReentrantLock lock = new ReentrantLock();
+</code></pre>
+<p>用于保证队列操作的线程安全性</p>
+<h5 id="优先队列"><a href="#优先队列" class="headerlink" title="优先队列"></a>优先队列</h5><pre><code class="java">private final PriorityQueue&lt;E&gt; q = new PriorityQueue&lt;E&gt;();
+</code></pre>
+<p>存储介质，用于保证延迟低的优先执行</p>
+<h5 id="leader"><a href="#leader" class="headerlink" title="leader"></a>leader</h5><blockquote>
+<p>leader 指向的是第一个从队列获取元素阻塞等待的线程，其作用是减少其他线程不必要的等待时间。（这个地方我一直没搞明白 怎么就减少其他线程的等待时间了）</p>
+</blockquote>
+<h5 id="condition"><a href="#condition" class="headerlink" title="condition"></a>condition</h5><pre><code class="java">private final Condition available = lock.newCondition();
+</code></pre>
+<p>条件对象，当新元素到达，或新线程可能需要成为leader时被通知</p>
+<p>下面将主要对队列的入队，出队动作进行分析 ：</p>
+<h5 id="入队-offer"><a href="#入队-offer" class="headerlink" title="入队 - offer"></a>入队 - offer</h5><pre><code class="java">    public boolean offer(E e) {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            // 入队
+            q.offer(e);
+            if (q.peek() == e) {
+                // 若入队的元素位于队列头部，说明当前元素延迟最小
+                // 将 leader 置空
+                leader = null;
+                // 唤醒阻塞在等待队列的线程
+                available.signal();
+            }
+            return true;
+        } finally {
+            lock.unlock();
+        }
+    }
+</code></pre>
+<h5 id="出队-poll"><a href="#出队-poll" class="headerlink" title="出队 - poll"></a>出队 - poll</h5><pre><code class="java">public E take() throws InterruptedException {
+        final ReentrantLock lock = this.lock;
+        lock.lockInterruptibly();
+        try {
+            for (;;) {
+                E first = q.peek();
+                if (first == null)
+                    // 等待 add 唤醒
+                    available.await();
+                else {
+                    long delay = first.getDelay(NANOSECONDS);
+                    if (delay &lt;= 0)
+                        // 已过期则直接返回队列头节点
+                        return q.poll();
+                    first = null; // don&#39;t retain ref while waiting
+                    if (leader != null)
+                        // 若 leader 不为空
+                        // 说明已经有其他线程调用过 take 操作
+                        // 当前调用线程 follower 挂起等待
+                        available.await();
+                    else {
+                        // 若 leader 为空
+                        // 将 leader 指向当前线程
+                        Thread thisThread = Thread.currentThread();
+                        leader = thisThread;
+                        try {
+                            // 当前调用线程在指定 delay 时间内挂起等待
+                            available.awaitNanos(delay);
+                        } finally {
+                            if (leader == thisThread)
+                                leader = null;
+                        }
+                    }
+                }
+            }
+        } finally {
+            if (leader == null &amp;&amp; q.peek() != null)
+                // leader 处理完之后，唤醒 follower
+                available.signal();
+            lock.unlock();
+        }
+    }
+</code></pre>
+<h5 id="Leader-follower-模式"><a href="#Leader-follower-模式" class="headerlink" title="Leader-follower 模式"></a>Leader-follower 模式</h5><p><img src="https://user-gold-cdn.xitu.io/2017/6/28/9b634edda31c08405212e34840edc61e?imageView2/0/w/1280/h/960/format/webp/ignore-error/1" alt></p>
+<p><a href="https://blog.csdn.net/goldlevi/article/details/7705180" target="_blank" rel="noopener">该图引用自 CSDN 《Leader/Follower多线程网络模型介绍》</a></p>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><blockquote>
+<p>看了 DelayQueue 的实现 我们大概也明白 PriorityQueue 采用小顶堆的原因了。</p>
+</blockquote>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;多线程</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/12/22/DelayQueue 延迟阻塞队列使用及分析/'; 
+            this.page.identifier = '/2018/12/22/DelayQueue 延迟阻塞队列使用及分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

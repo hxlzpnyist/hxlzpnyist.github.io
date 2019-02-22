@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>ThreadPoolExecutor线程池的实现分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">ThreadPoolExecutor线程池的实现分析</h1>
+        <p class="text-center"><b>星期四, 十二月 20日 2018, 4:09 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h3 id="ThreadPoolExecutor"><a href="#ThreadPoolExecutor" class="headerlink" title="ThreadPoolExecutor"></a>ThreadPoolExecutor</h3><blockquote>
+<p>线程池在 JAVA 中是运用场景最多的并发框架，合理的运用线程池能够带来以下好处：</p>
+</blockquote>
+<ul>
+<li>降低资源消耗。</li>
+<li>提高响应速度。</li>
+<li>提高线程的可管理性</li>
+</ul>
+<h4 id="构造"><a href="#构造" class="headerlink" title="构造"></a>构造</h4><pre><code class="java">public ThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue&lt;Runnable&gt; workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler) {
+    if (corePoolSize &lt; 0 ||
+        maximumPoolSize &lt;= 0 ||
+        maximumPoolSize &lt; corePoolSize ||
+        keepAliveTime &lt; 0)
+        throw new IllegalArgumentException();
+    if (workQueue == null || threadFactory == null || handler == null)
+        throw new NullPointerException();
+    this.acc = System.getSecurityManager() == null ?
+            null :
+            AccessController.getContext();
+    this.corePoolSize = corePoolSize;
+    this.maximumPoolSize = maximumPoolSize;
+    this.workQueue = workQueue;
+    this.keepAliveTime = unit.toNanos(keepAliveTime);
+    this.threadFactory = threadFactory;
+    this.handler = handler;
+}
+</code></pre>
+<p>参数说明：</p>
+<ul>
+<li>corePoolSize ：核心线程数</li>
+<li>maximumPoolSize : 最大线程数</li>
+<li>keepAliveTime : 空闲线程最大存活时间</li>
+<li>unit : 空闲线程存活时间单位</li>
+<li>workQueue : 用于保存等待执行的任务的阻塞队列</li>
+<li>threadFactory : 用于创建线程的工厂</li>
+<li>RejectedExecutionHandler : 饱和策略，就是当队列和线程池满了之后，采用何种策略处理提交的新任务</li>
+</ul>
+<h4 id="线程池状态"><a href="#线程池状态" class="headerlink" title="线程池状态"></a>线程池状态</h4><pre><code class="java">private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+private static final int COUNT_BITS = Integer.SIZE - 3;
+private static final int CAPACITY   = (1 &lt;&lt; COUNT_BITS) - 1;
+
+// runState is stored in the high-order bits
+private static final int RUNNING    = -1 &lt;&lt; COUNT_BITS;
+private static final int SHUTDOWN   =  0 &lt;&lt; COUNT_BITS;
+private static final int STOP       =  1 &lt;&lt; COUNT_BITS;
+private static final int TIDYING    =  2 &lt;&lt; COUNT_BITS;
+private static final int TERMINATED =  3 &lt;&lt; COUNT_BITS;
+
+// Packing and unpacking ctl
+// 计算 线程池运行状态
+private static int runStateOf(int c)     { return c &amp; ~CAPACITY; }
+// 计算 工作线程数
+private static int workerCountOf(int c)  { return c &amp; CAPACITY; }
+// 计算 ctl 值
+private static int ctlOf(int rs, int wc) { return rs | wc; }
+</code></pre>
+<ul>
+<li>RUNNING : 运行中，接收新的任务并且处理队列中的任务</li>
+<li>SHUTDOWN : 关闭，停止接收新的任务，但是可以处理队列中的任务</li>
+<li>STOP : 停止接收新的任务，也不处理队列中的任务；并中断处理中的任务</li>
+</ul>
+<p>ThreadPoolExecutor 采用一个原子的整形变量按位存储线程池的状态和线程池的当前工作线程数。<br>前 3 位为线程池状态，后 29 位为线程池工作线程数</p>
+<blockquote>
+<p>为什么采用高 3 位， 因为目前线程池状态值有 5 种，采用 3 位的话正好可以存储</p>
+</blockquote>
+<h4 id="execute"><a href="#execute" class="headerlink" title="execute"></a>execute</h4><pre><code class="java">public void execute(Runnable command) {
+    if (command == null)
+        throw new NullPointerException();
+    int c = ctl.get();
+    // workerCountOf 获取当前工作线程数
+    // 若当前工作线程数小于核心线程数
+    if (workerCountOf(c) &lt; corePoolSize) {
+        // 开启线程执行 command
+        // 成功执行则返回 true 退出
+        if (addWorker(command, true))
+            return;
+        // 执行失败
+        // 失败的原因 ：线程池状态变更为 SHUTDOWN 或 其他任务被提交执行导致工作线程数超过了核心线程数
+        c = ctl.get();
+    }
+    // 判断线程池状态是否为 RUNNING
+    // 将任务添加到 workQueue
+    if (isRunning(c) &amp;&amp; workQueue.offer(command)) {
+        int recheck = ctl.get();
+        // 任务被添加到 workQueue 后，再次检查线程池的运行状态
+        // 若线程池状态非 RUNNING, 则将任务从 workQueue 中移除
+        if (! isRunning(recheck) &amp;&amp; remove(command))
+            // 按指定的饱和拒绝策略处理任务
+            reject(command);
+        // 当工作线程数为 0 的时候，则开启新的线程从 workQueue 中获取任务并执行
+        else if (workerCountOf(recheck) == 0)
+            addWorker(null, false);
+    }
+    // 若队列满，任务无法加入队列中，则开启线程执行任务
+    else if (!addWorker(command, false))
+        // 若无法开启线程执行任务，说明当前工作线程数超过最大线程数
+        // 按指定饱和策略处理任务
+        reject(command);
+}
+</code></pre>
+<h5 id="创建-Worker"><a href="#创建-Worker" class="headerlink" title="创建 Worker"></a>创建 Worker</h5><pre><code class="java">private boolean addWorker(Runnable firstTask, boolean core) {
+    retry:
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // Check if queue empty only if necessary.
+        // 此处的判断说明当线程池状态为 SHUTDOWN 的时候，如果工作队列 workQueue 中还有任务的话，将会继续处理；反之不处理 （firstTask == null 说明不是新提交的任务， 也就是新提交的任务不予处理）
+        // 若状态大于 SHUTDOWN 也就是 STOP 时，无论工作队列中 workQueue 是否有任务都不予处理
+        if (rs &gt;= SHUTDOWN &amp;&amp;
+            ! (rs == SHUTDOWN &amp;&amp;
+               firstTask == null &amp;&amp;
+               ! workQueue.isEmpty()))
+            return false;
+
+        for (;;) {
+            // 获取工作线程数
+            int wc = workerCountOf(c);
+            // 判断当前工作线程数是否超过线程池最大容量
+            // 判断当前工作线程数是否超过核心线程数或者最大线程数
+            // 若超过则退出，也就是开启线程执行任务失败
+            if (wc &gt;= CAPACITY ||
+                wc &gt;= (core ? corePoolSize : maximumPoolSize))
+                return false;
+            // 工作线程数加一
+            if (compareAndIncrementWorkerCount(c))
+                // 退出循环
+                break retry;
+            c = ctl.get();  // Re-read ctl
+            if (runStateOf(c) != rs)
+                // 运行状态发生变化 则继续轮询
+                continue retry;
+            // else CAS failed due to workerCount change; retry inner loop
+        }
+    }
+
+    boolean workerStarted = false;
+    boolean workerAdded = false;
+    Worker w = null;
+    try {
+        // 创建 worker 对象
+        w = new Worker(firstTask);
+        final Thread t = w.thread;
+        if (t != null) {
+            final ReentrantLock mainLock = this.mainLock;
+            mainLock.lock();
+            try {
+                // Recheck while holding lock.
+                // Back out on ThreadFactory failure or if
+                // shut down before lock acquired.
+                int rs = runStateOf(ctl.get());
+
+                if (rs &lt; SHUTDOWN ||
+                    (rs == SHUTDOWN &amp;&amp; firstTask == null)) {
+                    if (t.isAlive()) // precheck that t is startable
+                        throw new IllegalThreadStateException();
+                    // 添加到 workers 工作线程集合中    
+                    workers.add(w);
+                    int s = workers.size();
+                    if (s &gt; largestPoolSize)
+                        largestPoolSize = s;
+                    workerAdded = true;
+                }
+            } finally {
+                mainLock.unlock();
+            }
+            if (workerAdded) {
+                // 线程启动
+                t.start();
+                workerStarted = true;
+            }
+        }
+    } finally {
+        if (! workerStarted)
+            addWorkerFailed(w);
+    }
+    return workerStarted;
+}
+</code></pre>
+<p>如下图所示为线程池创建 Worker 流程：</p>
+<p><img src="https://user-gold-cdn.xitu.io/2018/12/25/167e466500acfb5c?w=692&amp;h=1221&amp;f=png&amp;s=95611" alt></p>
+<blockquote>
+<p>从 addWorker 的实现可以看出，当线程池状态为 SHUTDOWN, STOP 时，将不会在接收新的任务</p>
+</blockquote>
+<h5 id="Worker-执行"><a href="#Worker-执行" class="headerlink" title="Worker 执行"></a>Worker 执行</h5><blockquote>
+<p>接下来我们看下 Worker 的构建</p>
+</blockquote>
+<pre><code class="java">Worker(Runnable firstTask) {
+    setState(-1); // inhibit interrupts until runWorker
+    this.firstTask = firstTask;
+    // 创建线程
+    this.thread = getThreadFactory().newThread(this);
+}
+</code></pre>
+<p>从 Worker 的构建可以看出，当线程启动时，实际上执行的是 Worker 的 run 方法。</p>
+<pre><code class="java">public void run() {
+    runWorker(this);
+}
+</code></pre>
+<pre><code class="java">final void runWorker(Worker w) {
+    Thread wt = Thread.currentThread();
+    Runnable task = w.firstTask;
+    w.firstTask = null;
+    w.unlock(); // allow interrupts
+    boolean completedAbruptly = true;
+    try {
+        // 若能够获取一个待执行的任务
+        // 也即是 firstTask 不为空或者 workQueue 工作队列中有待执行的任务
+        while (task != null || (task = getTask()) != null) {
+            w.lock();
+            // If pool is stopping, ensure thread is interrupted;
+            // if not, ensure thread is not interrupted.  This
+            // requires a recheck in second case to deal with
+            // shutdownNow race while clearing interrupt
+            if ((runStateAtLeast(ctl.get(), STOP) ||
+                 (Thread.interrupted() &amp;&amp;
+                  runStateAtLeast(ctl.get(), STOP))) &amp;&amp;
+                !wt.isInterrupted())
+                wt.interrupt();
+            try {
+                beforeExecute(wt, task);
+                Throwable thrown = null;
+                try {
+                    // 任务执行
+                    task.run();
+                } catch (RuntimeException x) {
+                    thrown = x; throw x;
+                } catch (Error x) {
+                    thrown = x; throw x;
+                } catch (Throwable x) {
+                    thrown = x; throw new Error(x);
+                } finally {
+                    afterExecute(task, thrown);
+                }
+            } finally {
+                task = null;
+                // 当前 worker 完成的任务数加一
+                w.completedTasks++;
+                w.unlock();
+            }
+        }
+        completedAbruptly = false;
+    } finally {
+        processWorkerExit(w, completedAbruptly);
+    }
+    }
+</code></pre>
+<blockquote>
+<p>接下来我们看下如何从 workQueue 中获取待执行的任务</p>
+</blockquote>
+<pre><code class="java">private Runnable getTask() {
+    boolean timedOut = false; // Did the last poll() time out?
+
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // Check if queue empty only if necessary.
+        // 线程池状态为 SHUTDOWN 并且 workQueue 为空的时候返回 null
+        // 线程池状态为 STOP 返回 null
+        if (rs &gt;= SHUTDOWN &amp;&amp; (rs &gt;= STOP || workQueue.isEmpty())) {
+            decrementWorkerCount();
+            return null;
+        }
+        // 获取当前工作线程数
+        int wc = workerCountOf(c);
+
+        // Are workers subject to culling?
+        // allowCoreThreadTimeOut 该变量是指是否允许核心线程在指定存活时间内未获取到任务后回收;
+        // wc &gt; corePoolSize 说明超过核心线程数的线程将会被回收
+        boolean timed = allowCoreThreadTimeOut || wc &gt; corePoolSize;
+        // 工作线程数超过最大线程数 可销毁
+        // 工作线程数超过核心线程数且上次等待获取任务超时 可销毁
+        // 若工作线程数等于 1 且 workQueue 队列为空的时候 可销毁
+        if ((wc &gt; maximumPoolSize || (timed &amp;&amp; timedOut))
+            &amp;&amp; (wc &gt; 1 || workQueue.isEmpty())) {
+            // 工作线程数减一
+            if (compareAndDecrementWorkerCount(c))
+                return null;
+            continue;
+        }
+
+        try {
+            // 从队列获取任务
+            // 若 timed 为 true, 则当前 worker 在指定的 keepAliveTime 时间内等待获取任务；若为空，那么 worker 在下次轮询的时候满足条件下将会退出被回收
+            Runnable r = timed ?
+                workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) :
+                workQueue.take();
+            if (r != null)
+                return r;
+            timedOut = true;
+        } catch (InterruptedException retry) {
+            timedOut = false;
+        }
+    }
+}
+</code></pre>
+<p>如下图所示为 worker 获取任务及执行任务的流程：</p>
+<p><img src="https://user-gold-cdn.xitu.io/2018/12/25/167e51ad3aa43d27?w=977&amp;h=606&amp;f=png&amp;s=81057" alt></p>
+<p>从 getTask 的实现可以看出在以下情况下将对 worker 执行退出销毁</p>
+<ul>
+<li>线程池状态为 STOP</li>
+<li>线程池状态为 SHUTDOWN, 且 workQueue 队列为空</li>
+<li>线程池工作线程数超过最大线程数</li>
+<li>线程池工作线程数大于 1，且允许核心线程回收（allowCoreThreadTimeOut = true）同时 worker 上次从队列获取任务时 timeout</li>
+<li>线程池工作线程数大于核心线程数并大于 1，同时 worker 上次从队列获取任务时 timeout</li>
+<li>线程池工作线程数等于 1 且 workQueue 为空</li>
+</ul>
+<blockquote>
+<p>个人理解 ：当 workQueue 不为空的时候，线程池最少会保留一个 worker 去执行任务</p>
+</blockquote>
+<p>接下来看下当 worker 退出后的逻辑 :</p>
+<pre><code class="java">private void processWorkerExit(Worker w, boolean completedAbruptly) {
+    // completedAbruptly 表示 worker 是否正常退出； true 说明用户任务处理过程中出现异常，false 是正常退出 
+    if (completedAbruptly) // If abrupt, then workerCount wasn&#39;t adjusted
+        // 若是异常退出的话，执行工作线程数减一
+        decrementWorkerCount();
+
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        // 累加完成的任务数
+        completedTaskCount += w.completedTasks;
+        // 将 worker 从工作线程集合 workers 中移除
+        workers.remove(w);
+    } finally {
+        mainLock.unlock();
+    }
+
+    // 尝试终止线程池
+    tryTerminate();
+
+    int c = ctl.get();
+    if (runStateLessThan(c, STOP)) {
+        if (!completedAbruptly) {
+            // 计算线程池允许的最小线程数
+            int min = allowCoreThreadTimeOut ? 0 : corePoolSize;
+            if (min == 0 &amp;&amp; ! workQueue.isEmpty())
+                // 若 min = 0，而 workQueue 不为空的话，说明有待处理的任务，则 min = 1，也就是至少有 1 个工作线程
+                min = 1;
+            // 若当前工作线程数 &gt;= min, 则退出；反之创建新的 worker
+            if (workerCountOf(c) &gt;= min)
+                return; // replacement not needed
+        }
+        // worker 非正常退出的话，重新创建新的 worker
+        addWorker(null, false);
+    }
+}
+</code></pre>
+<h4 id="shutdown"><a href="#shutdown" class="headerlink" title="shutdown"></a>shutdown</h4><blockquote>
+<p>关闭线程池，运行状态改为 SHUTDOWN; 并中断空闲的工作线程</p>
+</blockquote>
+<pre><code class="java">public void shutdown() {
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        checkShutdownAccess();
+        // 线程池状态修改为 SHUTDOWN
+        advanceRunState(SHUTDOWN);
+        // 中断空闲 worker
+        interruptIdleWorkers();
+        onShutdown(); // hook for ScheduledThreadPoolExecutor
+    } finally {
+        mainLock.unlock();
+    }
+    // 尝试终止线程池
+    tryTerminate();
+}
+</code></pre>
+<pre><code class="java">private void advanceRunState(int targetState) {
+    for (;;) {
+        int c = ctl.get();
+        // 当前状态值 小于 SHUTDOWN 的时候，执行更新
+        if (runStateAtLeast(c, targetState) ||
+            ctl.compareAndSet(c, ctlOf(targetState, workerCountOf(c))))
+            break;
+    }
+}
+</code></pre>
+<pre><code class="java">private void interruptIdleWorkers() {
+    interruptIdleWorkers(false);
+}
+
+
+private void interruptIdleWorkers(boolean onlyOne) {
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        for (Worker w : workers) {
+            Thread t = w.thread;
+            if (!t.isInterrupted() &amp;&amp; w.tryLock()) {
+                // worker 对应的线程未被中断过，且能够获取到锁，说明线程空闲（因为 worker 在获取到任务执行的时候，会 lock）
+                try {
+                    // 执行中断
+                    // 此时会唤醒阻塞在 workQueue.take 或 poll 操作上的 worker; 当 worker 在 getTask 继续轮询的时候会退出
+                    t.interrupt();
+                } catch (SecurityException ignore) {
+                } finally {
+                    w.unlock();
+                }
+            }
+            if (onlyOne)
+                break;
+        }
+    } finally {
+        mainLock.unlock();
+    }
+}
+</code></pre>
+<pre><code class="java">final void tryTerminate() {
+    for (;;) {
+        int c = ctl.get();
+        // 线程池状态为 STOP
+        // 线程池状态为 SHUTDOWN 且 workQueue 为空的时候可终止
+        if (isRunning(c) ||
+            runStateAtLeast(c, TIDYING) ||
+            (runStateOf(c) == SHUTDOWN &amp;&amp; ! workQueue.isEmpty()))
+            return;
+        // 工作线程数等于 0 的时候可终止
+        if (workerCountOf(c) != 0) { // Eligible to terminate
+            interruptIdleWorkers(ONLY_ONE);
+            return;
+        }
+
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            // 将工作线线程数改为 0，运行状态改为 TIDYING
+            if (ctl.compareAndSet(c, ctlOf(TIDYING, 0))) {
+                try {
+                    // 执行终止操作，由子类实现
+                    terminated();
+                } finally {
+                    // 将运行状态改为 TERMINATED
+                    ctl.set(ctlOf(TERMINATED, 0));
+                    termination.signalAll();
+                }
+                return;
+            }
+        } finally {
+            mainLock.unlock();
+        }
+        // else retry on failed CAS
+    }
+    }
+</code></pre>
+<h4 id="shutdownNow"><a href="#shutdownNow" class="headerlink" title="shutdownNow"></a>shutdownNow</h4><blockquote>
+<p>关闭线程池，运行状态修改为 STOP, 中断所有线程； 并返回未处理的任务</p>
+</blockquote>
+<pre><code class="java">public List&lt;Runnable&gt; shutdownNow() {
+    List&lt;Runnable&gt; tasks;
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        checkShutdownAccess();
+        // 将线程池状态改为 STOP
+        advanceRunState(STOP);
+        // 中断所有的 Worder
+        interruptWorkers();
+        // 清除任务队列，并返回任务列表
+        tasks = drainQueue();
+    } finally {
+        mainLock.unlock();
+    }
+    tryTerminate();
+    return tasks;
+}
+</code></pre>
+<pre><code class="java">private void interruptWorkers() {
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        // 将所有 worker 执行中断
+        for (Worker w : workers)
+            w.interruptIfStarted();
+    } finally {
+        mainLock.unlock();
+    }
+}
+</code></pre>
+<blockquote>
+<p>对于线程池的关闭操作 tryTerminate() 方法中的一段逻辑需要重点说明下，如下 </p>
+<pre><code class="java">if (workerCountOf(c) != 0) { // Eligible to terminate
+    interruptIdleWorkers(ONLY_ONE);
+    return;
+}
+</code></pre>
+<p>interruptIdleWorkers(ONLY_ONE)是什么意思呢？中断闲置的Worker，直到回收全部的Worker。这里没有那么暴力，只中断一个，中断之后退出方法，中断了Worker之后，Worker会回收，然后还是会调用tryTerminate方法，如果还有闲置线程，那么继续中断</p>
+</blockquote>
+<blockquote>
+<p>譬如有个场景 ： 线程池在执行 shutdown 操作后，假设工作线程 A, B 还在执行任务，此时假设 workQueue 队列中还有一个任务； 当 A, B 分别在继续执行 getTask 时，有可能 A 先获取到任务，B 被阻塞到 workQueue.task() 操作上，如果不进行 interruptIdleWorkers(ONLY_ONE) 处理，那么工作线程 B 将一直存活而无法回收。</p>
+</blockquote>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;多线程</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/12/20/ThreadPoolExecutor-线程池的实现分析/'; 
+            this.page.identifier = '/2018/12/20/ThreadPoolExecutor-线程池的实现分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

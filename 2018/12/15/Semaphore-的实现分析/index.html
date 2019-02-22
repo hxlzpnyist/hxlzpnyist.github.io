@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>Semaphore-源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">Semaphore-源码分析</h1>
+        <p class="text-center"><b>星期六, 十二月 15日 2018, 4:09 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="Semaphore"><a href="#Semaphore" class="headerlink" title="Semaphore"></a>Semaphore</h2><blockquote>
+<p>Semaphore 信号量：可以用来控制同时访问特定资源的线程数量；通过协调各个线程以保证合理的使用公共资源。</p>
+</blockquote>
+<h3 id="构造"><a href="#构造" class="headerlink" title="构造"></a>构造</h3><pre><code class="java">// permits 设置许可证的数量
+public Semaphore(int permits) {
+    // 默认非公平
+    sync = new NonfairSync(permits);
+}
+// permits 设置许可数量
+// fair 设置是否采用公平模式
+public Semaphore(int permits, boolean fair) {
+    sync = fair ? new FairSync(permits) : new NonfairSync(permits);
+}
+</code></pre>
+<h3 id="非公平模式"><a href="#非公平模式" class="headerlink" title="非公平模式"></a>非公平模式</h3><h4 id="acquire"><a href="#acquire" class="headerlink" title="acquire()"></a>acquire()</h4><blockquote>
+<p>获取许可。只有当获取到可用的许可，或者当前线程被中断；否则该线程被阻塞</p>
+</blockquote>
+<pre><code class="java">public void acquire() throws InterruptedException {
+    sync.acquireSharedInterruptibly(1);
+}
+</code></pre>
+<p>默认会调用 NonfairSync 下的 tryAcquireShared 方法，继续调用父类的 nonfairTryAcquireShared 方法</p>
+<pre><code class="java">protected int tryAcquireShared(int acquires) {
+    return nonfairTryAcquireShared(acquires);
+}
+</code></pre>
+<pre><code class="java">final int nonfairTryAcquireShared(int acquires) {
+    for (;;) {
+        // 获取当前 state 值
+        // 也即是当前可用的许可数
+        int available = getState();
+        // 当前可用许可数减去尝试获取许可的数
+        // 得到剩余许可数
+        int remaining = available - acquires;
+        // remaining &lt; 0 说明当前可用许可数小于尝试获取许可数，也即是获取同步状态失败 直接返回 remaining, 退出循环 当前线程会被添加到同步队列中
+        // remaining &gt; 0 说明当前可用许可数大于尝试获取许可数，
+        // 则执行 compareAndSetState 更新 state , 若更新成功则返回 退出循环 当前线程获取到许可
+        // 若 compareAndSetState 更新失败，说明有其他线程获取到许可，则继续轮询
+        if (remaining &lt; 0 ||
+            compareAndSetState(available, remaining))
+            return remaining;
+    }
+}
+</code></pre>
+<h4 id="release"><a href="#release" class="headerlink" title="release"></a>release</h4><blockquote>
+<p>释放许可</p>
+</blockquote>
+<pre><code class="java">public void release() {
+    sync.releaseShared(1);
+}
+</code></pre>
+<pre><code class="java">protected final boolean tryReleaseShared(int releases) {
+    for (;;) {
+        // 获取当前许可数
+        int current = getState();
+        // 当前许可 + 释放的许可数
+        int next = current + releases;
+        if (next &lt; current) // overflow
+            throw new Error(&quot;Maximum permit count exceeded&quot;);
+        // 更新 state 值, 更新成功则返回 true 退出循环；并唤醒同步队列上阻塞的线程
+        // 更新 state 值失败，说明有其他线程获取许可或释放了许可，则继续轮询
+        if (compareAndSetState(current, next))
+            return true;
+    }
+}
+</code></pre>
+<h3 id="公平模式"><a href="#公平模式" class="headerlink" title="公平模式"></a>公平模式</h3><h4 id="acquire-1"><a href="#acquire-1" class="headerlink" title="acquire"></a>acquire</h4><blockquote>
+<p>公平模式下获取许可</p>
+</blockquote>
+<pre><code class="java">protected int tryAcquireShared(int acquires) {
+    for (;;) {
+        // 判断同步队列上是否有阻塞的线程
+        // 若有的话，返回 -1 表示获取许可失败 退出循环加入同步队列中
+        if (hasQueuedPredecessors())
+            return -1;
+        int available = getState();
+        int remaining = available - acquires;
+        if (remaining &lt; 0 ||
+            compareAndSetState(available, remaining))
+            return remaining;
+    }
+}
+</code></pre>
+<p>从上述代码中可以看到，公平模式下获取许可和非公平模式下基本类似，只是为了保证 FIFO ，添加了 hasQueuedPredecessors 判断限制。</p>
+<h4 id="release-1"><a href="#release-1" class="headerlink" title="release"></a>release</h4><blockquote>
+<p>公平模式下与非公平模式一样</p>
+</blockquote>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>Semaphore 可以用来实现限流的作用。</p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;多线程</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/12/15/Semaphore-的实现分析/'; 
+            this.page.identifier = '/2018/12/15/Semaphore-的实现分析/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

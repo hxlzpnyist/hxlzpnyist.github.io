@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>ReentrantReadWriteLock-读写锁源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    archives
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    about
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">ReentrantReadWriteLock-读写锁源码分析</h1>
+        <p class="text-center"><b>星期四, 十二月 13日 2018, 4:09 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h3 id="ReentrantReadWriteLock-读写锁"><a href="#ReentrantReadWriteLock-读写锁" class="headerlink" title="ReentrantReadWriteLock 读写锁"></a>ReentrantReadWriteLock 读写锁</h3><blockquote>
+<p>读写锁不同于 ReentrantLock ，ReentrantLock 是排他锁同一时刻只允许一个线程访问，而读写锁同一时刻允许多个读线程访问，但是在写线程操作时，所有的读写操作均被阻塞。</p>
+</blockquote>
+<h4 id="读写状态实现"><a href="#读写状态实现" class="headerlink" title="读写状态实现"></a>读写状态实现</h4><blockquote>
+<p>如何通过一个 int 值记录读状态，写状态呢 ?</p>
+</blockquote>
+<p>在 ReentrantReadWriteLock 中通过对同步状态值进行“按位切割”，因为 int 占 32 位 bit，故一分为二，采用高 16 位表示读状态，低 16 位表示写状态。</p>
+<h5 id="如何获取写状态值"><a href="#如何获取写状态值" class="headerlink" title="如何获取写状态值"></a>如何获取写状态值</h5><p>我们假设同步状态值转换为二进制如下：</p>
+<pre><code class="java">0000 0000 0000 0010 | 0000 0000 0000 0101
+</code></pre>
+<blockquote>
+<p>上述同步状态值表示：读状态为 2， 写状态为 5</p>
+</blockquote>
+<p>那么我们如何获取状态值呢 ？ 我们思考下位的相关运算 ：</p>
+<ul>
+<li>位与操作(&amp;) 两个数同为 1 则为 1， 否则为 0</li>
+<li>位或操作(|) 两个数有一个为 1 则为 1， 否则为 0</li>
+</ul>
+<p>了解了 &amp; ，| 运算规律我们是不是可以这样操作呢，将同步状态值与如下二进制进行 &amp; 运算</p>
+<pre><code class="java">0000 0000 0000 0000 | 1111 1111 1111 1111
+</code></pre>
+<p>结果可得</p>
+<pre><code class="java">0000 0000 0000 0000 | 0000 0000 0000 0101
+</code></pre>
+<p>也就是写状态的二进制表示，值为 5. 那么</p>
+<pre><code class="java">0000 0000 0000 0000 | 1111 1111 1111 1111
+</code></pre>
+<p>该位与操作数转成十进制也即是 65535 (2^15 + 2^14 + ….. + 2^0)，由<code>等比数列</code>可知等于 2^16 - 1, 也等于 (1 &lt;&lt; 16) - 1 。 这也是 ReentrantReadWriteLock 内部定义的常量实现 ：</p>
+<pre><code class="java">static final int SHARED_SHIFT   = 16;
+static final int SHARED_UNIT    = (1 &lt;&lt; SHARED_SHIFT);
+static final int MAX_COUNT      = (1 &lt;&lt; SHARED_SHIFT) - 1;
+static final int EXCLUSIVE_MASK = (1 &lt;&lt; SHARED_SHIFT) - 1;
+</code></pre>
+<p><img src="https://user-gold-cdn.xitu.io/2018/12/3/16773eaff78b68e6?w=1056&amp;h=414&amp;f=png&amp;s=15413" alt></p>
+<h5 id="如何获取读状态值"><a href="#如何获取读状态值" class="headerlink" title="如何获取读状态值"></a>如何获取读状态值</h5><p>获取读状态相比写状态来说就比较简单了，只需同步状态值 &gt;&gt; 右移 16 位即可</p>
+<p><img src="https://user-gold-cdn.xitu.io/2018/12/3/167740000b4b1232?w=1052&amp;h=257&amp;f=png&amp;s=14294" alt></p>
+<h5 id="写状态值加一"><a href="#写状态值加一" class="headerlink" title="写状态值加一"></a>写状态值加一</h5><p>当写锁重入的时候，如何更新写状态值呢 ? 我们知道状态值的低 16 位表示写状态，那么每次写状态加一操作相当于下面二进制相加操作（逢二进一）</p>
+<pre><code class="java">0000 0000 0000 0000 | 0000 0000 0000 0011
+</code></pre>
+<pre><code class="java">0000 0000 0000 0000 | 0000 0000 0000 0001
+</code></pre>
+<p>相加可得</p>
+<pre><code class="java">0000 0000 0000 0000 | 0000 0000 0000 0100
+</code></pre>
+<p>也就是写状态值由 3 加一变成 4；那么对于写状态增加一时，也就是同步状态值 <code>S + 1</code> 即可。</p>
+<h5 id="读状态值加一"><a href="#读状态值加一" class="headerlink" title="读状态值加一"></a>读状态值加一</h5><p>读状态增加一，与写状态一样；只不过因为是高 16 位表示读状态，故是同步状态 <code>S + (1 &lt;&lt; 16)</code>.</p>
+<h4 id="构造"><a href="#构造" class="headerlink" title="构造"></a>构造</h4><pre><code class="java">public ReentrantReadWriteLock() {
+    this(false);
+}
+
+public ReentrantReadWriteLock(boolean fair) {
+    sync = fair ? new FairSync() : new NonfairSync();
+    readerLock = new ReadLock(this);
+    writerLock = new WriteLock(this);
+}
+</code></pre>
+<h4 id="writerLock-写锁"><a href="#writerLock-写锁" class="headerlink" title="writerLock() - 写锁"></a>writerLock() - 写锁</h4><pre><code class="java">public ReentrantReadWriteLock.WriteLock writeLock() {
+  return writerLock;
+}
+</code></pre>
+<h5 id="获取锁"><a href="#获取锁" class="headerlink" title="获取锁"></a>获取锁</h5><p>当执行 writeLock.lock() 的时候，实际上调用的是 sync.acquire(), 如下：</p>
+<pre><code class="java">public void lock() {
+    // 写锁是独占模式
+    sync.acquire(1);
+}
+</code></pre>
+<p>下面我们看下 sync 的 tryAcquire 实现如下：</p>
+<pre><code class="java">protected final boolean tryAcquire(int acquires) {
+      /*
+       * Walkthrough:
+       * 1. If read count nonzero or write count nonzero
+       *    and owner is a different thread, fail.
+       * 2. If count would saturate, fail. (This can only
+       *    happen if count is already nonzero.)
+       * 3. Otherwise, this thread is eligible for lock if
+       *    it is either a reentrant acquire or
+       *    queue policy allows it. If so, update state
+       *    and set owner.
+       */
+      Thread current = Thread.currentThread();
+      // 获取同步状态值
+      int c = getState();
+      // 获取写状态值
+      int w = exclusiveCount(c);
+      if (c != 0) {
+          // (Note: if c != 0 and w == 0 then shared count != 0)
+          // c != 0 说明此时已经有读或有写或有读写
+          // 若 w == 0 说明此时有读操作，则获取写锁失败
+          // 若 w != 0 说明此时已经有写操作
+          // 若 current != getExclusiveOwnerThread() 说明当前获取写锁的线程并非是写锁对象的持有者, 则重入失败
+          if (w == 0 || current != getExclusiveOwnerThread())
+              return false;
+          // 重入次数超过最大值 抛出异常
+          if (w + exclusiveCount(acquires) &gt; MAX_COUNT)
+              throw new Error(&quot;Maximum lock count exceeded&quot;);
+          // Reentrant acquire
+          // 设置状态值
+          setState(c + acquires);
+          return true;
+      }
+      if (writerShouldBlock() ||
+          !compareAndSetState(c, c + acquires))
+          return false;
+      // 设置当前线程为写锁的持有者
+      setExclusiveOwnerThread(current);
+      return true;
+  }
+</code></pre>
+<p>从代码的实现及注释中所描述的内容，可得知以下场景会获取写锁失败 :</p>
+<ul>
+<li>当前已经有读操作，则获取写锁失败</li>
+<li>当前已经有写操作，但当前线程并非写锁对象的持有者，则获取写锁失败（也是重入失败）</li>
+<li>当前没有任何操作，CAS 更新状态值失败，则获取写锁失败</li>
+</ul>
+<h5 id="释放锁"><a href="#释放锁" class="headerlink" title="释放锁"></a>释放锁</h5><pre><code class="java">protected final boolean tryRelease(int releases) {
+    // 判断当前线程是否为写锁对象的持有者
+    if (!isHeldExclusively())
+        throw new IllegalMonitorStateException();
+    // 同步状态值释放
+    int nextc = getState() - releases;
+    // 判断写状态是否为 0; 写状态为 0 说明写锁完成释放
+    boolean free = exclusiveCount(nextc) == 0;
+    if (free)
+        // 清空写锁的持有者
+        setExclusiveOwnerThread(null);
+    setState(nextc);
+    return free;
+}
+</code></pre>
+<h4 id="readLock-读锁"><a href="#readLock-读锁" class="headerlink" title="readLock() - 读锁"></a>readLock() - 读锁</h4><pre><code class="java">public ReentrantReadWriteLock.ReadLock  readLock()  {
+  return readerLock;
+}
+</code></pre>
+<h5 id="获取锁-1"><a href="#获取锁-1" class="headerlink" title="获取锁"></a>获取锁</h5><pre><code class="java">public void lock() {
+    sync.acquireShared(1);
+}
+</code></pre>
+<blockquote>
+<p>因为读写锁是支持同时多个线程获取读锁，所以调用的是 sync 共享式获取同步状态。 这里针对读锁的获取和释放我们简化下实现忽略对读锁计数统计的操作。</p>
+</blockquote>
+<pre><code class="java">protected final int tryAcquireShared(int unused) {
+    Thread current = Thread.currentThread();
+
+    for (;;) {
+        // 获取读状态值
+        int c = getState();
+        // exclusiveCount(c) != 0 说明有写操作
+        // getExclusiveOwnerThread != current 说明当前线程非写锁的对象持有者; 则获取读锁失败
+        // 若 getExclusiveOwnerThread == current 也就是说明线程获取写锁之后是可以继续获取读锁的
+        if (exclusiveCount(c) != 0) {
+            if (getExclusiveOwnerThread() != current)
+                return -1;
+            // else we hold the exclusive lock; blocking here
+            // would cause deadlock.
+        }
+        if (sharedCount(c) == MAX_COUNT)
+            throw new Error(&quot;Maximum lock count exceeded&quot;);
+        if (compareAndSetState(c, c + SHARED_UNIT)) {
+            // 忽略读锁计数统计的操作 
+            return 1;
+        }
+    }
+}
+</code></pre>
+<h5 id="释放锁-1"><a href="#释放锁-1" class="headerlink" title="释放锁"></a>释放锁</h5><pre><code class="java">protected final boolean tryReleaseShared(int unused) {
+    Thread current = Thread.currentThread();
+    // 忽略读锁计数统计的操作 
+    for (;;) {
+        int c = getState();
+        int nextc = c - SHARED_UNIT;
+        if (compareAndSetState(c, nextc))
+            // Releasing the read lock has no effect on readers,
+            // but it may allow waiting writers to proceed if
+            // both read and write locks are now free.
+            return nextc == 0;
+    }
+}
+</code></pre>
+<h4 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h4><ul>
+<li>读写锁的实现关键在于如何通过一个 int 值，分别记录读写状态。（采用按位切割，高 16 位为读状态，低 16 位状态）</li>
+<li>何时可以获取读锁 ?  获取写锁的线程可以再次获取读锁，获取读锁的线程数未超过 2^16 - 1 时是可以获取读锁。</li>
+<li>何时可以获取写锁 ?  已经有读锁在操作则不可用获取写锁</li>
+</ul>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;jdk</span>
+                      &nbsp;
+                       
+                      <span class="badge badge-default">#&nbsp;多线程</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    <div class="disqus" style="width:100%">
+    <div id="disqus_thread"></div>
+    <script>               
+        var disqus_shortname = '';
+        var disqus_config = function () {
+            this.page.url = 'https://hxlzpnyist.github.io/2018/12/13/ReentrantReadWriteLock-读写锁/'; 
+            this.page.identifier = '/2018/12/13/ReentrantReadWriteLock-读写锁/';
+        };
+        (function() { 
+            var d = document, s = d.createElement('script');
+            s.type = 'text/javascript';
+            s.src = '//'+disqus_shortname+'.disqus.com/embed.js';
+            s.setAttribute('data-timestamp', +new Date());
+            (d.head || d.body).appendChild(s);
+        })();
+    </script>
+    <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>                                
+</div>
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

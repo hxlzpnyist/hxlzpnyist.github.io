@@ -97,6 +97,171 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/01/24/jdk之BlockingQueue/" class="h3 title" target="_self">jdk之BlockingQueue</a>
+                    
+                    <p>概述BlockingQueue 被称为阻塞队列，除了具备 Queue 的特点外，还支持另外两项重要特性：
+
+对于有界队列，当队列满的时候，插入操作会阻塞等待队列可用；
+
+当队列空的时候，获取元素的操作会阻塞等待队列为非空
+
+阻塞队列常用于“生产者－消费者”模式的业务场景，生产者就是往阻塞队列中插入元素的线程，消费者就是从阻塞队列中获取元素的线程；当生产者的速度大于消费者的速度，就可能出现有界队列满的情况，此时生产者就会出现阻塞等待状态直到队列中出现空闲；当生产者的速度小于消费者的速度就可能出现空队列的情况，消费者就会出现阻塞等待状态，直到队列中有元素。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-24
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/01/20/Netty客户端链接派发分析/" class="h3 title" target="_self">Netty客户端链接派发分析</a>
+                    
+                    <p>在上篇针对 Netty 的服务端启动过程进行了分析，我们知道服务端包含了两个 NioEventLoopGroup, 一个是 boss 用于接收客户端的请求，一个是 worker 用于处理客户端的读写操作；那么 boss group 是如何将客户端链接通道派发到 worker 呢？本文主要针对这个问题进行分析。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-20
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    netty &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/01/17/Netty服务端启动源码分析/" class="h3 title" target="_self">Netty服务端启动源码分析</a>
+                    
+                    <p>  Netty 是一个高性能异步事件驱动的 NIO 框架, 因其底层采用的 NIO, 故其启动过程一样可以分为以下几个步骤:
+
+selector 多路复用选择器开启
+ServerSocketChannel 通道建立并绑定端口
+ServerSocketChannel 通道注册到 selector 并监听 accept 事件
+
+在进行服务端启动分析前，我们先看下 netty 的服务端使用示例。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-17
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    netty &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/01/08/Jdk之ReentrantLock源码分析/" class="h3 title" target="_self">Jdk之ReentrantLock源码分析</a>
+                    
+                    <p>概述ReentrantLock 是重入锁，也就是说支持重新进入的锁，也表示同一线程在获取锁之后可以再次获取锁。
+
+synchronizer 关键字是隐式的支持重进入的，比如说采用 synchronizer 修饰的递归方法，在方法执行时，执行线程在获取锁之后依然可以连续多次获得锁。
+
+ReentrantLock 支持获取锁时的公平和非公平性的选择，默认为非公平性锁。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-08
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/22/zookeeper源码阅读之watch/" class="h3 title" target="_self">zookeeper源码阅读之watch</a>
+                    
+                    <p>watcher 流程概述watcher 用来客户端监听某一节点的特性变化，执行对应的操作. 从下图可以看出 watcher 的流程主要包括:
+
+
+
+watcher 注册, 包括客户端注册, 服务端的注册
+watcher 触发
+watcher 执行
+
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-22
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    zookeeper &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2017/12/21/NIO-selector的wakeup/" class="h3 title" target="_self">NIO selector的wakeup</a>
+                    
+                    <p>wakeUp
+某个线程调用select()方法后阻塞了，即使没有通道已经就绪，也有办法让其从select()方法返回。只要让其它线程在第一个线程调用select()方法的那个对象上调用Selector.wakeup()方法即可。阻塞在select()方法上的线程会立马返回。如果有其它线程调用了wakeup()方法，但当前没有线程阻塞在select()方法上，下个调用select()方法的线程会立即“醒来（wake up）”。
+
+引用至 http://ifeve.com/selectors/...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-21
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    NIO &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2017/12/15/zookeeper源码阅读之client/" class="h3 title" target="_self">zookeeper源码阅读之client</a>
                     
                     <p>zookeeper client 启动流程
@@ -239,34 +404,6 @@ Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacit
                 </div>
         </div>
        
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2017/12/12/vim编写markdown实时预览/" class="h3 title" target="_self">VIM 支持 markdown 预览</a>
-                    
-                    <p>安装 vim 插件管理器 vundle下载 vundle    git clone https://github.com/VundleVim/Vundle.vim ~/.vim/bundle/Vundle.vim
-编辑 vim 配置文件 vimrc
-通过 apt-get install vim 安装的 vim 配置文件路径为 /etc/vim/vimrc
-
-    vim /etc/vim/vimrc
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2017-12-12
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    vim &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
          
         <br><br>
         
@@ -276,6 +413,10 @@ Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacit
                 <i class="material-icons">navigate_before</i>
             </a>
         
+        
+            <a class="btn btn-primary btn-just-icon btn-round" href="/page/4/">
+                <i class="material-icons">navigate_next</i>
+            </a>
         
     </div>
 

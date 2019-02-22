@@ -97,101 +97,26 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2019/02/22/测试文章/" class="h3 title" target="_self">测试文章</a>
+                    <a href="/2018/12/28/Thread的中断理解/" class="h3 title" target="_self">Thread的中断理解</a>
                     
-                    <p>测试标题
-这是测试内容
+                    <p>Thread 的中断理解
+首先我们需要明确一个概念 中断并非是终止。 
 
-...</p>
+interrupt()
+线程中断方法, 调用该方法时会将线程的中断标志位标记为 true; (注意你可以理解为只是单纯的改变下标记，并不是使线程停止运行)
+
+isInterrupted()
+获取线程的中断标志位，也就是判断是否被中断过; true 表示被中断过
+
+Interr...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2019-02-22
+                        <i class="material-icons">date_range</i>2018-12-28
                         
                             <i class="material-icons">bookmark_border</i>
                                 
-                                    java &nbsp;
-                                
-                                    后端 &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" style="background-image: url(../img/post2.jpeg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" class="h3 title" target="_self">TCP：三次握手、四次握手、backlog及其他</a>
-                    
-                    <p>参考博客　TCP：三次握手、四次握手、backlog及其他
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-13
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/03/11/Java内存模型/" style="background-image: url(../img/post1.jpg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/03/11/Java内存模型/" class="h3 title" target="_self">Java内存模型</a>
-                    
-                    <p>定义Java 虚拟机规范中通过定义一种 Java 内存模型来屏蔽掉各种硬件和操作系统的内存访问差异，以实现 Java 程序在各种平台下都能达到一致的内存访问效果。
-主内存与工作内存主内存 : 在 Java 内存模型中规定了所有的变量都存储在主内存中。工作内存 : 每个线程都有自己的工作内存，在工作内存中保存了该线程使用到的变量的主内存副本拷贝；线程...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-11
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/03/05/Jdk之LinkedHashMap/" style="background-image: url(../img/post1.jpg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/03/05/Jdk之LinkedHashMap/" class="h3 title" target="_self">Jdk之LinkedHashMap</a>
-                    
-                    <p>概述LinkedHashMap 与 HashMap 的不同之处在于前者遍历有序，后者遍历无序
-
-从上图中可以看出 LinkedHashMap 继承至 HashMap , 并重写了 init, createEntry, addEntry, iterator 等方法。
-同时新增了全局变量 header, 并自定义了 LinkedHashMap.Entry 内部类...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-05
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    数据结构 &nbsp;
+                                    多线程 &nbsp;
                                 
                         
                     </p>
@@ -204,67 +129,26 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2018/03/05/Jdk之HashMap/" class="h3 title" target="_self">Jdk之HashMap</a>
+                    <a href="/2018/12/25/FutureTask/" class="h3 title" target="_self">FutureTask 源码分析</a>
                     
-                    <p>概述HashMap 是散列表的一种基于拉链法的实现方式。
-本文先看下 HashMap 的迭代实现方式
-    private abstract class HashIterator&lt;E&gt; implements Iterator&lt;E&gt; {
-        Entry&lt;K,V&gt; next;        // nex...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-05
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/01/jdk之TreeMap/" class="h3 title" target="_self">jdk之TreeMap</a>
-                    
-                    <p>定义TreeMap 基于红黑树实现
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-01
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/02/28/jdk之LinkedList/" style="background-image: url(../img/post3.jpeg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/02/28/jdk之LinkedList/" class="h3 title" target="_self">jdk之LinkedList</a>
-                    
-                    <p>定义public class LinkedList&lt;E&gt;
-    extends AbstractSequentialList&lt;E&gt;
-        implements List&lt;E&gt;, Deque&lt;E&gt;, Cloneable, java.io.Serializable
+                    <p>FutureTask 源码分析
+基于 JDK 1.7 
 
-从定义可以看出 LinkedList 实现了接口 List, Deque, 表明其支持列表,栈，队列，双端队列的操作。...</p>
+成员变量    private volatile int state;
+    private static final int NEW          = 0;
+    private static final int COMPLETING   = 1;
+    private stat...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2018-02-28
+                        <i class="material-icons">date_range</i>2018-12-25
                         
                             <i class="material-icons">bookmark_border</i>
                                 
                                     jdk &nbsp;
                                 
+                                    多线程 &nbsp;
+                                
                         
                     </p>
                     
@@ -276,74 +160,243 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2018/02/26/数据结构-平衡二叉树/" class="h3 title" target="_self">数据结构-平衡二叉树</a>
+                    <a href="/2018/12/22/DelayQueue 延迟阻塞队列使用及分析/" class="h3 title" target="_self">DelayQueue 延迟阻塞队列使用及分析</a>
                     
-                    <p>概念平衡二叉树平衡二叉树(Self-Balancing Binary Search Tree) 是一种二叉排序树，其中每一个节点的左子树和右子树的高度差至多等于１。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-02-26
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/01/29/java-泛型/" style="background-image: url(../img/post2.jpeg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/01/29/java-泛型/" class="h3 title" target="_self">java-泛型</a>
-                    
-                    <p>类型擦除泛型和方法重载...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-29
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    java &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" style="background-image: url(../img/post4.jpg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" class="h3 title" target="_self">jdk之LinkedBlockingQueue</a>
-                    
-                    <p>概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。
-分析前我们同样有以下疑问：
+                    <p>延迟阻塞队列 DelayQueue
+DelayQueue 是一个支持延时获取元素的阻塞队列， 内部采用优先队列 PriorityQueue 存储元素，同时元素必须实现 Delayed 接口；在创建元素时可以指定多久才可以从队列中获取当前元素，只有在延迟期满时才能从队列中提取元素。
 
-如何通过链表实现队列的 FIFO ?
-如何保证队列操作的同步 ?
-与 ArrayBlockingQueue 相比有如何优势 ?
-...</p>
+使用场景
+因延迟阻塞队列的特性， 我们一般将 DelayQueue...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-26
+                        <i class="material-icons">date_range</i>2018-12-22
                         
                             <i class="material-icons">bookmark_border</i>
                                 
                                     jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/20/ThreadPoolExecutor-线程池的实现分析/" class="h3 title" target="_self">ThreadPoolExecutor线程池的实现分析</a>
+                    
+                    <p>ThreadPoolExecutor
+线程池在 JAVA 中是运用场景最多的并发框架，合理的运用线程池能够带来以下好处：
+
+
+降低资源消耗。
+提高响应速度。
+提高线程的可管理性
+
+构造public ThreadPoolExecutor(int corePoolSize,
+                              int maxim...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-20
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/15/Semaphore-的实现分析/" class="h3 title" target="_self">Semaphore-源码分析</a>
+                    
+                    <p>Semaphore
+Semaphore 信号量：可以用来控制同时访问特定资源的线程数量；通过协调各个线程以保证合理的使用公共资源。
+
+构造// permits 设置许可证的数量
+public Semaphore(int permits) {
+    // 默认非公平
+    sync = new NonfairSync(permits);
+}
+//...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-15
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/13/ReentrantReadWriteLock-读写锁/" class="h3 title" target="_self">ReentrantReadWriteLock-读写锁源码分析</a>
+                    
+                    <p>ReentrantReadWriteLock 读写锁
+读写锁不同于 ReentrantLock ，ReentrantLock 是排他锁同一时刻只允许一个线程访问，而读写锁同一时刻允许多个读线程访问，但是在写线程操作时，所有的读写操作均被阻塞。
+
+读写状态实现
+如何通过一个 int 值记录读状态，写状态呢 ?
+
+在 ReentrantReadWrit...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-13
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/11/ReentrantLock-重入锁源码分析/" class="h3 title" target="_self">ReentrantLock-重入锁源码分析</a>
+                    
+                    <p>ReentrantLock
+重入锁, 表示该锁支持一个线程对资源的重复加锁
+
+类结构首先让我们先看下 ReentrantLock 的类结构如下图所示：
+
+从图中我们可以看出 ReentrantLock 实现 Lock 接口，同时内部类 Sync 是 AQS 的子类；而 Sync 又有两个子类 NonfairSync 和 FairSync 分别对应非...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-11
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/09/CyclicBarrier-同步屏障的实现分析/" class="h3 title" target="_self">CyclicBarrier 同步屏障的源码分析</a>
+                    
+                    <p>CyclicBarrier
+CyclicBarrier 是可循环使用的屏障，主要功能是让一组线程到达一个屏障时被阻塞，直到最后一个线程到达屏障时，屏障才会打开；所有被屏障拦截的线程才会继续执行。
+
+使用示例public class CyclicBarrierTest {
+
+    // 线程个数
+    private int parties = ...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-09
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/07/CountDownLatch实现分析/" class="h3 title" target="_self">CountDownLatch-源码分析</a>
+                    
+                    <p>CountDownLatch
+CountdownLatch 是 JDK 并发包中提供的并发工具类，其允许一个或多个线程等待其他线程完成操作。常用作将一个任务拆分成多个子任务同时执行，只有子任务都执行完毕主线程才往下执行。
+
+使用示例public class App implements Runnable
+{
+    private CountDow...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-07
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/05/AQS 之 Condition/" class="h3 title" target="_self">AQS 之 Condition-的源码分析</a>
+                    
+                    <p>
+在使用 Lock 锁的过程中，我们往往会使用到另外一个对象 Condition ，用于等待/通知模式的处理。
+
+Condition 的创建    Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+
+使用 Condition 的前提是获取锁...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-05
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
                                 
                         
                     </p>
