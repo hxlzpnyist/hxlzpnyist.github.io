@@ -97,6 +97,34 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/01/24/jdk之ArrayBlockingQueue/" class="h3 title" target="_self">jdk之ArrayBlockingQueue</a>
+                    
+                    <p>概述ArrayBlockingQueue 又称为数组阻塞队列；其基于数组实现的有界阻塞队列，能容纳的元素数量固定，一旦创建就不能再增加其容量。
+那么接下来我们会带着以下两个疑问进行分析：
+
+如何通过数组实现队列的特性 FIFO ?
+如何保证队列插入获取操作的同步 ?
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-24
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2018/01/24/jdk之BlockingQueue/" class="h3 title" target="_self">jdk之BlockingQueue</a>
                     
                     <p>概述BlockingQueue 被称为阻塞队列，除了具备 Queue 的特点外，还支持另外两项重要特性：
@@ -357,46 +385,6 @@ Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacit
                                     NIO &nbsp;
                                 
                                     bytebuffer &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2017/12/12/zookeeper源码阅读之server/" class="h3 title" target="_self">zookeeper源码阅读之server</a>
-                    
-                    <p>zookeeper server 启动流程概述
-此次只针对单机模式对 server 端的启动流程分析, 首先看下 zookeeper server 启动时序图，如下：
-
-
-
-其启动流程如下：
-
-执行 zkServer.sh start 脚本, 会调用 QuorumPeerMain.main(); 执行 initializeAndRun 方法
-调用 QuorumPeerConfig.parse() 方法，该方法主要是对启动参数的解析并加载相应的配置文件
-通过上文解析的配置, 判断当前启动模式是否为集群或单机模式
-单机模式下调用 ZookeeperServerMain.main() 方法
-执行 ZookeeperServerMain.initializeAndRun 方法
-调用 ServerConfig.parse 再次解析启动参数加载配置文件
-调用 runFromConfig , 在该方法中依次启动 JettyAdminServer.start(), NIOServerCnxnFactory.startup()
-
-
-
-至此 zookeeper server 完成单机模式下启动，接下来将详细看下 NIOServerCnxnFactory.startup 的启动过程。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2017-12-12
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    zookeeper &nbsp;
                                 
                         
                     </p>
