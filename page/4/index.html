@@ -97,6 +97,45 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2017/12/13/NIO之ByteBuffer/" class="h3 title" target="_self">NIO之ByteBuffer</a>
+                    
+                    <p>ByteBuffer字段说明
+
+Capacity : Buffer 固定的容量大小
+Position : 表示当前的位置， 初始值为0；当为写模式时，当写入一个字节的时候，position会向前移动到下一个可插入数据的buffer单元；当为读模式时，position会重置为0，每读取一个字节的时候，position会向前移动下一个可读取的位置。
+Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacity; 读模式下limit = position
+
+
+初始化
+采用jvm堆内存初始
+
+  /**
+   * 定义初始容量10字节的缓冲区 capacity=10, limit=10, position=0
+   */
+  ByteBuffer byteBuffer = ByteBuffer.allocate(10);
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-13
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    NIO &nbsp;
+                                
+                                    bytebuffer &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2017/12/12/zookeeper源码阅读之server/" class="h3 title" target="_self">zookeeper源码阅读之server</a>
                     
                     <p>zookeeper server 启动流程概述

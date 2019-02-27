@@ -96,6 +96,40 @@
         <div class="row post-card">
             
             
+                
+                <div class="col-md-4">
+                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" style="background-image: url(/img/post4.jpg)" class="post-index-img" target="_self"></a> 
+                </div>
+            
+                <div class="col-md-7">
+                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" class="h3 title" target="_self">jdk之LinkedBlockingQueue</a>
+                    
+                    <p>概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。
+分析前我们同样有以下疑问：
+
+如何通过链表实现队列的 FIFO ?
+如何保证队列操作的同步 ?
+与 ArrayBlockingQueue 相比有如何优势 ?
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-26
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
                 <div class="col-md-11">
                     <a href="/2018/01/24/jdk之ArrayBlockingQueue/" class="h3 title" target="_self">jdk之ArrayBlockingQueue</a>
                     
@@ -346,45 +380,6 @@ public ZooKeeperMain(String args[]) throws IOException, InterruptedException {
                             <i class="material-icons">bookmark_border</i>
                                 
                                     NIO &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2017/12/13/NIO之ByteBuffer/" class="h3 title" target="_self">NIO之ByteBuffer</a>
-                    
-                    <p>ByteBuffer字段说明
-
-Capacity : Buffer 固定的容量大小
-Position : 表示当前的位置， 初始值为0；当为写模式时，当写入一个字节的时候，position会向前移动到下一个可插入数据的buffer单元；当为读模式时，position会重置为0，每读取一个字节的时候，position会向前移动下一个可读取的位置。
-Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacity; 读模式下limit = position
-
-
-初始化
-采用jvm堆内存初始
-
-  /**
-   * 定义初始容量10字节的缓冲区 capacity=10, limit=10, position=0
-   */
-  ByteBuffer byteBuffer = ByteBuffer.allocate(10);
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2017-12-13
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    NIO &nbsp;
-                                
-                                    bytebuffer &nbsp;
                                 
                         
                     </p>

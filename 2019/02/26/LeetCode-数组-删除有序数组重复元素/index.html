@@ -19,7 +19,7 @@
     <meta name="description" content>
     <meta name="author" content="hxlzpnyist">
     <meta name="keywords" content>
-    <title>LeetCode-数组-三数之和 ~ 断风雨</title>
+    <title>LeetCode-数组-删除有序数组重复元素 ~ 断风雨</title>
     <link rel="stylesheet" href="/css/Material_Icons.css">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
     <link rel="stylesheet" href="/css/main.css">
@@ -84,8 +84,8 @@
   <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
     
       <div class="container">
-        <h1 class="title text-center post_title">LeetCode-数组-三数之和</h1>
-        <p class="text-center"><b>星期日, 二月 24日 2019, 5:44 下午</b></p>
+        <h1 class="title text-center post_title">LeetCode-数组-删除有序数组重复元素</h1>
+        <p class="text-center"><b>星期二, 二月 26日 2019, 1:39 下午</b></p>
       </div>
     
   </div>
@@ -99,102 +99,50 @@
       <div class="container">
         <div class="section">
           <div class="post_content">
-              <h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给定一个包含 n 个整数的数组 nums，判断 nums 中是否存在三个元素 a，b，c ，使得 a + b + c = 0 ？找出所有满足条件且不重复的三元组。</p>
-<p>注意：答案中不可以包含重复的三元组。 <a href="https://leetcode-cn.com/problems/3sum/" target="_blank" rel="noopener">习题原文</a></p>
+              <h2 id="题目描述"><a href="#题目描述" class="headerlink" title="题目描述"></a>题目描述</h2><p>给定一个排序数组，你需要在原地删除重复出现的元素，使得每个元素只出现一次，返回移除后数组的新长度。</p>
+<p>不要使用额外的数组空间，你必须在原地修改输入数组并在使用 O(1) 额外空间的条件下完成。</p>
+<pre><code class="java">
+给定数组 nums = [1,1,2], 
+
+函数应该返回新的长度 2, 并且原数组 nums 的前两个元素被修改为 1, 2。
+
+</code></pre>
 <h2 id="解题思路"><a href="#解题思路" class="headerlink" title="解题思路"></a>解题思路</h2><blockquote>
-<p>求三数之和为 0, nums[i] + nums[j] + nums[k] = 0 可以转换为求两个数之和，也即是 nums[i] + nums[j] = -nums[k]; 那么就可以通过指针移动去查找满足公式的数字，而为了方便控制指针的移动，前提是一组数字是有序的。</p>
+<p>采用双指针方式处理。</p>
 </blockquote>
-<p>那么大概的解题思路如下:</p>
-<ul>
-<li>对数组排序</li>
-<li>定义三个指针 i, left, right; 指针 i 指向的是求和项，指针 left, right 分别指向数组的头部和尾部</li>
-<li>当 -nums[i] = nums[left] + nums[right] 时满足公式，指针 left, right 继续向中部移动</li>
-<li>当 -nums[i] &gt; nums[left] + nums[right] 时指针 left 向中部移动</li>
-<li>当 -nums[i] &lt; nums[left] + nums[right] 时指针 righr 向中部移动</li>
-<li>当指针 left，right 交叉时停止移动，指针 i 向下移动，指针 left, right 重置</li>
-</ul>
-<p>其流程如下图所示:</p>
-<p><img src="https://user-gold-cdn.xitu.io/2019/2/25/169233bc2f6c206c?w=813&amp;h=400&amp;f=gif&amp;s=117798" alt></p>
-<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><pre><code class="java">public static List&lt;List&lt;Integer&gt;&gt; solution(int[] nums) {
-    // 排序
-    Arrays.sort(nums);
+<ol>
+<li>初始指针 i, j 位置为 0</li>
+<li>指针 j 先向右移动</li>
+<li>比较指针 i,j 元素是否相同，若指针i，j元素相同则指针 j 继续向右移动；反之将指针 j 元素复制到指针 i + 1 处元素</li>
+<li>当指针 j 移动到数组末尾时则停止</li>
+</ol>
+<p>其流程如下图所示：</p>
+<p><img src="https://user-gold-cdn.xitu.io/2019/2/27/1692f54909db90f0?w=681&amp;h=308&amp;f=gif&amp;s=47731" alt></p>
+<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><pre><code class="java">public static int solution (int[] nums) {
+    int i = 0, j = 0;
 
-    List&lt;List&lt;Integer&gt;&gt; rs = new ArrayList&lt;&gt;();
+    while (true) {
+        // 指针 j 向右移动
+        j++;
 
-    int i = 0, left = 1, right = nums.length - 1;
-
-    while (i &lt; nums.length - 2) {
-        while (true) {
-            // 左右指针交叉退出
-            if (right &lt;= left) {
-                break;
-            }
-
-            if (-nums[i] == nums[left] + nums[right]) {
-                rs.add(Arrays.asList(nums[i], nums[left], nums[right]));
-
-                // 过滤同一结果内重复的数字
-                // 左右指针继续向中间移动
-                while (true) {
-                    if (left &gt;= nums.length - 1) {
-                        break;
-                    }
-
-                    if (nums[left] != nums[left + 1]) {
-                        left++;
-                        break;
-                    } else {
-                        left++;
-                    }
-                }
-
-                while (true) {
-                    if (right &lt;= 0) {
-                        break;
-                    }
-
-                    if (nums[right] != nums[right - 1]) {
-                        right--;
-                        break;
-                    } else {
-                        right--;
-                    }
-                }
-
-                continue;
-            }
-
-            if (-nums[i] &lt;= nums[left] + nums[right]) {
-                right--;
-                continue;
-            }
-
-            if (-nums[i] &gt; nums[left] + nums[right]) {
-                left++;
-                continue;
-            }
+        // 指针 j 移动到数组末尾则退出，说明数组元素都判断了去重
+        if (j &gt;= nums.length) {
+            break;
         }
 
-        // 过滤同一结果值的数字
-        while (true) {
-            if (i &gt;= nums.length - 1) {
-                break;
-            }
-
-            if (nums[i] != nums[i + 1]) {
-                i++;
-                break;
-            } else {
-                i++;
-            }
+        if (nums[j] == nums[i]) {
+            // 指针 i, j 元素相同，说明重复元素；
+            // 指针 j 继续向右移动
+            continue;
+        } else {
+            // 指针 i, j 元素不相同；则将指针 j 元素复制到 指针 i 后一位，这样就保证指针 i 后元素不重复
+            nums[i + 1] = nums[j];
+            // 指针 i 向右移动，继续处理
+            i++;
         }
-
-        //i++;
-        left = i + 1;
-        right = nums.length - 1;
     }
 
-    return rs;
+    return i + 1;
 }
 </code></pre>
 
@@ -203,7 +151,7 @@
           <div>
               <p>
                        
-                      <span class="badge badge-default">#&nbsp;LeetCode</span>
+                      <span class="badge badge-default">#&nbsp;leetcode</span>
                       &nbsp;
                       
               </p>
