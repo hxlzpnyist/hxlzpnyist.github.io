@@ -101,7 +101,7 @@
           <div class="post_content">
               <h2 id="为何重拾"><a href="#为何重拾" class="headerlink" title="为何重拾"></a>为何重拾</h2><p>使用了 Spring 多年，但是对其底层的一些实现还是一知半解，一些概念比较模糊；故决定重新拾起，加深对 Spring 的认识。</p>
 <h2 id="重拾计划"><a href="#重拾计划" class="headerlink" title="重拾计划"></a>重拾计划</h2><h3 id="spring-版本说明"><a href="#spring-版本说明" class="headerlink" title="spring 版本说明"></a>spring 版本说明</h3><p>Spring 在经过多年的演进过程中，其功能越来越丰富，组件越来越多；为了避免在阅读源码的过程中深陷泥潭中，决定采用最原始的版本 1.0； 但又不局限于 1.0 版本。</p>
-<h3 id="spring-ioc"><a href="#spring-ioc" class="headerlink" title="spring ioc"></a>spring ioc</h3><h3 id="spring-aop"><a href="#spring-aop" class="headerlink" title="spring aop"></a>spring aop</h3><h3 id="spring-事务管理"><a href="#spring-事务管理" class="headerlink" title="spring 事务管理"></a>spring 事务管理</h3><h3 id="spring-orm-集成"><a href="#spring-orm-集成" class="headerlink" title="spring orm 集成"></a>spring orm 集成</h3><h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><blockquote>
+<h3 id="spring-ioc"><a href="#spring-ioc" class="headerlink" title="spring ioc"></a>spring ioc</h3><h3 id="spring-aop"><a href="#spring-aop" class="headerlink" title="spring aop"></a>spring aop</h3><h3 id="spring-事务管理"><a href="#spring-事务管理" class="headerlink" title="spring 事务管理"></a>spring 事务管理</h3><h3 id="spring-orm-集成"><a href="#spring-orm-集成" class="headerlink" title="spring orm 集成"></a>spring orm 集成</h3><h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><h3 id="Spring-容器启动"><a href="#Spring-容器启动" class="headerlink" title="Spring 容器启动"></a>Spring 容器启动</h3><blockquote>
 <p>在本文中，通过常用的构造 <code>ClassPathXmlApplicationContext</code> 实例来作为对 Spring 实现分析的入口 </p>
 </blockquote>
 <pre><code class="java">    ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;applicationContext.xml&quot;);
@@ -182,6 +182,56 @@
 <li>实例化应用自定义的 BeanPostProcessor 并注册到 BeanFactory 实例中</li>
 <li>实例化 Spring 容器中的 Bean</li>
 </ul>
+<h3 id="Spring-容器关闭"><a href="#Spring-容器关闭" class="headerlink" title="Spring 容器关闭"></a>Spring 容器关闭</h3><pre><code class="java">public void close() {
+    logger.info(&quot;Closing application context [&quot; + getDisplayName() + &quot;]&quot;);
+
+    // destroy all cached singletons in this context,
+    // invoking DisposableBean.destroy and/or &quot;destroy-method&quot;
+    // 销毁容器中缓存的单例对象实例
+    // 执行容器中 DisposableBean 的 destroy 方法
+    getBeanFactory().destroySingletons();
+
+    // publish respective event
+    // 发送 spring 上下文关闭事件
+    publishEvent(new ContextClosedEvent(this));
+}
+</code></pre>
+<p>通过调用链追踪，Spring 会遍历容器中缓存的 bean 实例调用 destroyBean 方法。</p>
+<pre><code class="java">protected void destroyBean(String beanName, Object bean) {
+    logger.debug(&quot;Retrieving depending beans for bean &#39;&quot; + beanName + &quot;&#39;&quot;);
+    // 先销毁所有依赖当前 bean 的实例
+    String[] dependingBeans = getDependingBeanNames(beanName);
+    if (dependingBeans != null) {
+        for (int i = 0; i &lt; dependingBeans.length; i++) {
+            destroySingleton(dependingBeans[i]);
+        }
+    }
+
+    if (bean instanceof DisposableBean) {
+        // 如果 bean 实现了 DisposableBean 接口，将会执行 destroy 方法
+        logger.debug(&quot;Calling destroy() on bean with name &#39;&quot; + beanName + &quot;&#39;&quot;);
+        try {
+            ((DisposableBean) bean).destroy();
+        }
+        catch (Exception ex) {
+            logger.error(&quot;destroy() on bean with name &#39;&quot; + beanName + &quot;&#39; threw an exception&quot;, ex);
+        }
+    }
+
+    try {
+        RootBeanDefinition bd = getMergedBeanDefinition(beanName, false);
+        if (bd.getDestroyMethodName() != null) {
+            // 如果 bean 定义了 destroy-method 属性，将会调用自定义的销毁方法
+            logger.debug(&quot;Calling custom destroy method &#39;&quot; + bd.getDestroyMethodName() +
+                                     &quot;&#39; on bean with name &#39;&quot; + beanName + &quot;&#39;&quot;);
+            invokeCustomDestroyMethod(beanName, bean, bd.getDestroyMethodName());
+        }
+    }
+    catch (NoSuchBeanDefinitionException ex) {
+        // ignore, from manually registered singleton
+    }
+}
+</code></pre>
 <blockquote>
 <p>下面将针对 Spring Bean 在容器启动过程中的各个环节的实现进行详细说明</p>
 </blockquote>
@@ -491,8 +541,8 @@
     &lt;bean scope=&quot;prototype&quot; /&gt;
 </code></pre>
 <p>Spring 1.0 中通过 bean 定义属性 <code>singleton=&#39;false&#39;</code> 表示原型模式； 在 Spring 2.x 之后版本改为定义属性 <code>scope=&#39;prototype&#39;</code>, 同时兼容 1.0 的配置</p>
-<h4 id="Spring-Bean-生命周期"><a href="#Spring-Bean-生命周期" class="headerlink" title="Spring Bean 生命周期"></a>Spring Bean 生命周期</h4><p><img src="https://user-gold-cdn.xitu.io/2019/2/28/169330ec7525f88b?w=659&amp;h=939&amp;f=png&amp;s=56918" alt></p>
-<h5 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h5><pre><code class="java">public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFactoryAware, ResourceLoaderAware, ApplicationContextAware {
+<h4 id="Spring-Bean-生命周期"><a href="#Spring-Bean-生命周期" class="headerlink" title="Spring Bean 生命周期"></a>Spring Bean 生命周期</h4><p><img src="https://user-gold-cdn.xitu.io/2019/2/28/1693443b5df05ef0?w=659&amp;h=1200&amp;f=png&amp;s=75243" alt></p>
+<h5 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h5><pre><code class="java">public class LifecycleBean implements BeanNameAware, InitializingBean, BeanFactoryAware, ResourceLoaderAware, ApplicationContextAware, DisposableBean {
 
     public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
         System.out.println(&quot;set bean factory&quot;);
@@ -527,7 +577,16 @@
         System.out.println(&quot;post Process After Initialization&quot;);
         return bean;
     }
+
+    public void destroy() throws Exception {
+        System.out.println(&quot;do destroy &quot;);
+    }
+
+    public void destroyMethod() throws Exception {
+        System.out.println(&quot;do destroy method&quot;);
+    }
 }
+
 </code></pre>
 <pre><code class="java">public class PostProcessor implements BeanPostProcessor {
     public Object postProcessBeforeInitialization(Object bean, String name) throws BeansException {
@@ -553,7 +612,8 @@
 &lt;/beans&gt;
 </code></pre>
 <p>运行结果如下：</p>
-<pre><code>set bean name
+<pre><code>
+set bean name
 set bean factory
 set resource loader
 set application context
@@ -561,6 +621,9 @@ post Process Before Initialization
 Initializing Bean afterPropertiesSet
 do init method
 post Process After Initialization
+do destroy 
+do destroy method
+
 </code></pre><h4 id="Spring-Bean-注入方式"><a href="#Spring-Bean-注入方式" class="headerlink" title="Spring Bean 注入方式"></a>Spring Bean 注入方式</h4><h5 id="构造注入"><a href="#构造注入" class="headerlink" title="构造注入"></a>构造注入</h5><pre><code class="xml">&lt;bean&gt;
     &lt;constructor-arg index=&quot;1&quot;&gt;
         &lt;value&gt;&lt;/value&gt;
@@ -652,12 +715,220 @@ if (mergedBeanDefinition.getResolvedAutowireMode() == RootBeanDefinition.AUTOWIR
 </code></pre>
 <p>当 bean 定义配置如上，或者采用 byName, byType 的注入方式时，都会调用 <code>applyPropertyValues</code> 方法完成属性的注入。（详细实现参考源码吧）</p>
 <h4 id="Spring-Bean-注解式注入"><a href="#Spring-Bean-注解式注入" class="headerlink" title="Spring Bean 注解式注入"></a>Spring Bean 注解式注入</h4><blockquote>
-<p>自 Spring 2.5 版本之后，支持通过注解方式实现 Bean 的自动注入</p>
+<p>自 Spring 2.5 版本之后，支持通过注解方式实现 Bean 的自动注入，譬如 <code>@Autowired</code>, <code>@Resource</code> 等注解</p>
 </blockquote>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><h3 id="BeanFactoryPostProcessor-amp-BeanPostProcessor"><a href="#BeanFactoryPostProcessor-amp-BeanPostProcessor" class="headerlink" title="BeanFactoryPostProcessor &amp; BeanPostProcessor"></a>BeanFactoryPostProcessor &amp; BeanPostProcessor</h3><h3 id="BeanFactory-amp-FactoryBean"><a href="#BeanFactory-amp-FactoryBean" class="headerlink" title="BeanFactory &amp; FactoryBean"></a>BeanFactory &amp; FactoryBean</h3><blockquote>
-<p>相关类作用说明</p>
+<p>为了引入注解式自动注入, Spring 在 2.x 版本中新增了 <code>InstantiationAwareBeanPostProcessor</code> 接口，该接口继承 <code>BeanPostProcessor</code> 并新增了方法 <code>postProcessPropertyValues</code> ; 该方法主要实现</p>
+<pre><code>Post-process the given property values before the factory applies them to the given bean
+</code></pre><h5 id="Autowired-注解"><a href="#Autowired-注解" class="headerlink" title="Autowired 注解"></a>Autowired 注解</h5><blockquote>
+<p>采用 Autowired 注解实现自动注入，需在配置文件中配置 <code>AutowiredAnnotationBeanPostProcessor</code> Bean</p>
 </blockquote>
+<pre><code class="java">public AutowiredAnnotationBeanPostProcessor() {
+    this.autowiredAnnotationTypes.add(Autowired.class);
+    this.autowiredAnnotationTypes.add(Value.class);
+    ClassLoader cl = AutowiredAnnotationBeanPostProcessor.class.getClassLoader();
+    try {
+        this.autowiredAnnotationTypes.add((Class&lt;? extends Annotation&gt;) cl.loadClass(&quot;javax.inject.Inject&quot;));
+        logger.info(&quot;JSR-330 &#39;javax.inject.Inject&#39; annotation found and supported for autowiring&quot;);
+    }
+    catch (ClassNotFoundException ex) {
+        // JSR-330 API not available - simply skip.
+    }
+}
+</code></pre>
+<p>从 <code>AutowiredAnnotationBeanPostProcessor</code> 构造可以看出其支持 <code>@Autowired</code>,<code>@Value</code>,<code>@Inject</code> 注解的自动注入。 下面大概看下其如何实现自动注入</p>
+<pre><code class="java">public PropertyValues postProcessPropertyValues(
+            PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeansException {
+    // 查找 bean 中需要自动注入的元数据，包括 field， method
+    InjectionMetadata metadata = findAutowiringMetadata(bean.getClass());
+    try {
+        // 实现注入
+        metadata.inject(bean, beanName, pvs);
+    }
+    catch (Throwable ex) {
+        throw new BeanCreationException(beanName, &quot;Injection of autowired dependencies failed&quot;, ex);
+    }
+    return pvs;
+}
+</code></pre>
+<h5 id="Resource-注解"><a href="#Resource-注解" class="headerlink" title="Resource 注解"></a>Resource 注解</h5><blockquote>
+<p>采用 Resource 注解实现自动注入，需在配置文件中配置 <code>CommonAnnotationBeanPostProcessor</code> Bean</p>
+</blockquote>
+<pre><code class="java">public CommonAnnotationBeanPostProcessor() {
+    setOrder(Ordered.LOWEST_PRECEDENCE - 3);
+    setInitAnnotationType(PostConstruct.class);
+    setDestroyAnnotationType(PreDestroy.class);
+    ignoreResourceType(&quot;javax.xml.ws.WebServiceContext&quot;);
+}
+</code></pre>
+<p>从 <code>CommonAnnotationBeanPostProcessor</code> 构造可以看出，该类同时支持对注解 <code>@PostConstruct</code>, <code>@PreDestroy</code> 生效。</p>
+<pre><code class="java">public PropertyValues postProcessPropertyValues(
+            PropertyValues pvs, PropertyDescriptor[] pds, Object bean, String beanName) throws BeansException {
+    // 查找 bean 中标注有 @Resource 注解的 Field， method
+    InjectionMetadata metadata = findResourceMetadata(bean.getClass());
+    try {
+        // 实现注入
+        metadata.inject(bean, beanName, pvs);
+    }
+    catch (Throwable ex) {
+        throw new BeanCreationException(beanName, &quot;Injection of resource dependencies failed&quot;, ex);
+    }
+    return pvs;
+}
+</code></pre>
+<pre><code class="java">
+public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
+    // 查找 bean 定义中标注了 PostConstruct 注解的方法
+    LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
+    try {
+        // 调用指定 post construct method
+        metadata.invokeInitMethods(bean, beanName);
+    }
+    catch (InvocationTargetException ex) {
+        throw new BeanCreationException(beanName, &quot;Invocation of init method failed&quot;, ex.getTargetException());
+    }
+    catch (Throwable ex) {
+        throw new BeanCreationException(beanName, &quot;Couldn&#39;t invoke init method&quot;, ex);
+    }
+    return bean;
+}
 
+public void postProcessBeforeDestruction(Object bean, String beanName) throws BeansException {
+    // 查找 bean 定义中标注了 PreDestroy 注解的方法
+    LifecycleMetadata metadata = findLifecycleMetadata(bean.getClass());
+    try {
+        // 调用指定 destroy method
+        metadata.invokeDestroyMethods(bean, beanName);
+    }
+    catch (InvocationTargetException ex) {
+        String msg = &quot;Invocation of destroy method failed on bean with name &#39;&quot; + beanName + &quot;&#39;&quot;;
+        if (logger.isDebugEnabled()) {
+            logger.warn(msg, ex.getTargetException());
+        }
+        else {
+            logger.warn(msg + &quot;: &quot; + ex.getTargetException());
+        }
+    }
+    catch (Throwable ex) {
+        logger.error(&quot;Couldn&#39;t invoke destroy method on bean with name &#39;&quot; + beanName + &quot;&#39;&quot;, ex);
+    }
+}
+</code></pre>
+<pre><code class="java">private LifecycleMetadata buildLifecycleMetadata(Class clazz) {
+    final boolean debug = logger.isDebugEnabled();
+    LinkedList&lt;LifecycleElement&gt; initMethods = new LinkedList&lt;LifecycleElement&gt;();
+    LinkedList&lt;LifecycleElement&gt; destroyMethods = new LinkedList&lt;LifecycleElement&gt;();
+    Class&lt;?&gt; targetClass = clazz;
+
+    do {
+        LinkedList&lt;LifecycleElement&gt; currInitMethods = new LinkedList&lt;LifecycleElement&gt;();
+        LinkedList&lt;LifecycleElement&gt; currDestroyMethods = new LinkedList&lt;LifecycleElement&gt;();
+        // 遍历 bean 的所有方法
+        for (Method method : targetClass.getDeclaredMethods()) {
+            if (this.initAnnotationType != null) {
+                // 判断 method 是否标注了 @PostConstruct 注解
+                if (method.getAnnotation(this.initAnnotationType) != null) {
+                    LifecycleElement element = new LifecycleElement(method);
+                    currInitMethods.add(element);
+                    if (debug) {
+                        logger.debug(&quot;Found init method on class [&quot; + clazz.getName() + &quot;]: &quot; + method);
+                    }
+                }
+            }
+            if (this.destroyAnnotationType != null) {
+                // 判断 method 是否标注了 @PreDestroy 注解
+                if (method.getAnnotation(this.destroyAnnotationType) != null) {
+                    currDestroyMethods.add(new LifecycleElement(method));
+                    if (debug) {
+                        logger.debug(&quot;Found destroy method on class [&quot; + clazz.getName() + &quot;]: &quot; + method);
+                    }
+                }
+            }
+        }
+        initMethods.addAll(0, currInitMethods);
+        destroyMethods.addAll(currDestroyMethods);
+        targetClass = targetClass.getSuperclass();
+    }
+    while (targetClass != null &amp;&amp; targetClass != Object.class);
+
+    return new LifecycleMetadata(clazz, initMethods, destroyMethods);
+}
+</code></pre>
+<h5 id="lt-context-annotation-config-gt"><a href="#lt-context-annotation-config-gt" class="headerlink" title="&lt;context: annotation-config&gt;"></a>&lt;context: annotation-config&gt;</h5><blockquote>
+<p>为了简化 Spring 配置文件中的 bean 配置，Spring 提供了 &lt;context: annotation-config&gt; 标签自动加载 <code>AutowiredAnnotationBeanPostProcessor</code>, <code>CommonAnnotationBeanPostProcessor</code> 等 bean。</p>
+</blockquote>
+<p>在 spring-context 包 resources/META-INF 下的 spring.handlers 文件中配置如下：</p>
+<pre><code class="json">
+http\://www.springframework.org/schema/context=org.springframework.context.config.ContextNamespaceHandler
+
+</code></pre>
+<pre><code class="java">public class ContextNamespaceHandler extends NamespaceHandlerSupport {
+
+    public void init() {
+        registerBeanDefinitionParser(&quot;property-placeholder&quot;, new PropertyPlaceholderBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;property-override&quot;, new PropertyOverrideBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;annotation-config&quot;, new AnnotationConfigBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;component-scan&quot;, new ComponentScanBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;load-time-weaver&quot;, new LoadTimeWeaverBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;spring-configured&quot;, new SpringConfiguredBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;mbean-export&quot;, new MBeanExportBeanDefinitionParser());
+        registerBeanDefinitionParser(&quot;mbean-server&quot;, new MBeanServerBeanDefinitionParser());
+    }
+
+}
+</code></pre>
+<pre><code class="java">public static Set&lt;BeanDefinitionHolder&gt; registerAnnotationConfigProcessors(
+            BeanDefinitionRegistry registry, Object source) {
+
+    Set&lt;BeanDefinitionHolder&gt; beanDefs = new LinkedHashSet&lt;BeanDefinitionHolder&gt;(4);
+
+    if (!registry.containsBeanDefinition(CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+        RootBeanDefinition def = new RootBeanDefinition(ConfigurationClassPostProcessor.class);
+        def.setSource(source);
+        beanDefs.add(registerPostProcessor(registry, def, CONFIGURATION_ANNOTATION_PROCESSOR_BEAN_NAME));
+    }
+
+    if (!registry.containsBeanDefinition(AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+        // 加载注册 AutowiredAnnotationBeanPostProcessor
+        RootBeanDefinition def = new RootBeanDefinition(AutowiredAnnotationBeanPostProcessor.class);
+        def.setSource(source);
+        beanDefs.add(registerPostProcessor(registry, def, AUTOWIRED_ANNOTATION_PROCESSOR_BEAN_NAME));
+    }
+
+    if (!registry.containsBeanDefinition(REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+        // 加载注册 RequiredAnnotationBeanPostProcessor
+        RootBeanDefinition def = new RootBeanDefinition(RequiredAnnotationBeanPostProcessor.class);
+        def.setSource(source);
+        beanDefs.add(registerPostProcessor(registry, def, REQUIRED_ANNOTATION_PROCESSOR_BEAN_NAME));
+    }
+
+    // Check for JSR-250 support, and if present add the CommonAnnotationBeanPostProcessor.
+    if (jsr250Present &amp;&amp; !registry.containsBeanDefinition(COMMON_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+        // 加载注册 CommonAnnotationBeanPostProcessor
+        RootBeanDefinition def = new RootBeanDefinition(CommonAnnotationBeanPostProcessor.class);
+        def.setSource(source);
+        beanDefs.add(registerPostProcessor(registry, def, COMMON_ANNOTATION_PROCESSOR_BEAN_NAME));
+    }
+
+    // Check for JPA support, and if present add the PersistenceAnnotationBeanPostProcessor.
+    if (jpaPresent &amp;&amp; !registry.containsBeanDefinition(PERSISTENCE_ANNOTATION_PROCESSOR_BEAN_NAME)) {
+        RootBeanDefinition def = new RootBeanDefinition();
+        try {
+            ClassLoader cl = AnnotationConfigUtils.class.getClassLoader();
+            def.setBeanClass(cl.loadClass(PERSISTENCE_ANNOTATION_PROCESSOR_CLASS_NAME));
+        }
+        catch (ClassNotFoundException ex) {
+            throw new IllegalStateException(
+                    &quot;Cannot load optional framework class: &quot; + PERSISTENCE_ANNOTATION_PROCESSOR_CLASS_NAME, ex);
+        }
+        def.setSource(source);
+        beanDefs.add(registerPostProcessor(registry, def, PERSISTENCE_ANNOTATION_PROCESSOR_BEAN_NAME));
+    }
+
+    return beanDefs;
+}
+</code></pre>
+<p>可以看出在 Spring 启动时，通过解析 &lt;context: annotation-config&gt; 标签，完成对 <code>CommonAnnotationBeanPostProcessor</code>, <code>AutowiredAnnotationBeanPostProcessor</code> 的加载注册，进而实现通过注解方式的自动注入。</p>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><h3 id="BeanFactory-amp-ApplicationContext"><a href="#BeanFactory-amp-ApplicationContext" class="headerlink" title="BeanFactory &amp; ApplicationContext"></a>BeanFactory &amp; ApplicationContext</h3><h3 id="BeanFactoryPostProcessor-amp-BeanPostProcessor"><a href="#BeanFactoryPostProcessor-amp-BeanPostProcessor" class="headerlink" title="BeanFactoryPostProcessor &amp; BeanPostProcessor"></a>BeanFactoryPostProcessor &amp; BeanPostProcessor</h3><h3 id="BeanFactory-amp-FactoryBean"><a href="#BeanFactory-amp-FactoryBean" class="headerlink" title="BeanFactory &amp; FactoryBean"></a>BeanFactory &amp; FactoryBean</h3>
           </div>
           <br><br>
           <div>
