@@ -928,7 +928,16 @@ http\://www.springframework.org/schema/context=org.springframework.context.confi
 }
 </code></pre>
 <p>可以看出在 Spring 启动时，通过解析 &lt;context: annotation-config&gt; 标签，完成对 <code>CommonAnnotationBeanPostProcessor</code>, <code>AutowiredAnnotationBeanPostProcessor</code> 的加载注册，进而实现通过注解方式的自动注入。</p>
-<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><h3 id="BeanFactory-amp-ApplicationContext"><a href="#BeanFactory-amp-ApplicationContext" class="headerlink" title="BeanFactory &amp; ApplicationContext"></a>BeanFactory &amp; ApplicationContext</h3><h3 id="BeanFactoryPostProcessor-amp-BeanPostProcessor"><a href="#BeanFactoryPostProcessor-amp-BeanPostProcessor" class="headerlink" title="BeanFactoryPostProcessor &amp; BeanPostProcessor"></a>BeanFactoryPostProcessor &amp; BeanPostProcessor</h3><h3 id="BeanFactory-amp-FactoryBean"><a href="#BeanFactory-amp-FactoryBean" class="headerlink" title="BeanFactory &amp; FactoryBean"></a>BeanFactory &amp; FactoryBean</h3>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><h3 id="BeanFactory-amp-ApplicationContext"><a href="#BeanFactory-amp-ApplicationContext" class="headerlink" title="BeanFactory &amp; ApplicationContext"></a>BeanFactory &amp; ApplicationContext</h3><p><img src="https://user-gold-cdn.xitu.io/2019/2/28/16934d44ec16ceb1?w=463&amp;h=360&amp;f=png&amp;s=14587" alt></p>
+<h3 id="BeanFactoryPostProcessor-amp-BeanPostProcessor"><a href="#BeanFactoryPostProcessor-amp-BeanPostProcessor" class="headerlink" title="BeanFactoryPostProcessor &amp; BeanPostProcessor"></a>BeanFactoryPostProcessor &amp; BeanPostProcessor</h3><ul>
+<li><code>BeanFactoryPostProcessor</code> 是 <code>ApplicationContext</code> 在 BeanFactory 完成创建后对其进行后置处理的接口</li>
+<li><code>BeanPostProcessor</code> 是 <code>BeanFactory</code> 在 Bean 完成实例化对其进行的后置处理接口</li>
+</ul>
+<h3 id="BeanFactory-amp-FactoryBean"><a href="#BeanFactory-amp-FactoryBean" class="headerlink" title="BeanFactory &amp; FactoryBean"></a>BeanFactory &amp; FactoryBean</h3><ul>
+<li>BeanFactory 是 Spring 框架底层的核心接口，其提供了创建 bean，获取 bean 等核心功能。</li>
+<li>FactoryBean 是生产 bean 的一个模式，也就是以工厂模式的方式生产 bean。</li>
+</ul>
+
           </div>
           <br><br>
           <div>
