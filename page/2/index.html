@@ -97,6 +97,36 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/12/11/ReentrantLock-重入锁源码分析/" class="h3 title" target="_self">ReentrantLock-重入锁源码分析</a>
+                    
+                    <p>ReentrantLock
+重入锁, 表示该锁支持一个线程对资源的重复加锁
+
+类结构首先让我们先看下 ReentrantLock 的类结构如下图所示：
+
+从图中我们可以看出 ReentrantLock 实现 Lock 接口，同时内部类 Sync 是 AQS 的子类；而 Sync 又有两个子类 NonfairSync 和 FairSync 分别对应非...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-11
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2018/12/09/CyclicBarrier-同步屏障的实现分析/" class="h3 title" target="_self">CyclicBarrier 同步屏障的源码分析</a>
                     
                     <p>CyclicBarrier
@@ -337,38 +367,6 @@ Condition 的创建    Lock lock = new ReentrantLock();
                     
                     <p class="h6">
                         <i class="material-icons">date_range</i>2018-03-05
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/02/28/jdk之LinkedList/" style="background-image: url(/img/post3.jpeg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/02/28/jdk之LinkedList/" class="h3 title" target="_self">jdk之LinkedList</a>
-                    
-                    <p>定义public class LinkedList&lt;E&gt;
-    extends AbstractSequentialList&lt;E&gt;
-        implements List&lt;E&gt;, Deque&lt;E&gt;, Cloneable, java.io.Serializable
-
-从定义可以看出 LinkedList 实现了接口 List, Deque, 表明其支持列表,栈，队列，双端队列的操作。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-02-28
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    jdk &nbsp;
-                                
                         
                     </p>
                     

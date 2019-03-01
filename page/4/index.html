@@ -97,6 +97,44 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2017/12/15/zookeeper源码阅读之client/" class="h3 title" target="_self">zookeeper源码阅读之client</a>
+                    
+                    <p>zookeeper client 启动流程
+先看下 zookeeper client 相关类图
+
+执行 zkCli.sh 脚本时, 会运行 org.apache.zookeeper.ZookeeperMain 类主方法.public static void main(String args[])
+        throws KeeperException, IOException, InterruptedException
+{
+    ZooKeeperMain main = new ZooKeeperMain(args);
+    main.run();
+}
+
+
+public ZooKeeperMain(String args[]) throws IOException, InterruptedException {
+    // 启动参数解析
+    cl.parseOptions(args);
+    System.out.println(&quot;Connecting to &quot; + cl.getOption(&quot;server&quot;));
+    // 链接 zookeeper server
+    connectToZK(cl.getOption(&quot;server&quot;));
+}
+
+
+从代码中可以看出 client 启动时首先构造 ZookeeperMain　对象实例,构造过程中会先解析 client 的启动参数（若未指定任何参数将会默认链接本机 2181 端口 zookeeper server）...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2017-12-15
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2017/12/14/NIO之粘包拆包处理/" class="h3 title" target="_self">NIO之粘包拆包处理</a>
                     
                     <p>概述
