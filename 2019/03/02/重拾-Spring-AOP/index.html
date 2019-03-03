@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>重拾-Spring-AOP ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">重拾-Spring-AOP</h1>
+        <p class="text-center"><b>星期六, 三月 2日 2019, 9:59 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="AOP-术语"><a href="#AOP-术语" class="headerlink" title="AOP 术语"></a>AOP 术语</h2><p>关于 AOP 的概念描述及相关术语可以参考 <a href="https://segmentfault.com/a/1190000007469968#articleHeader5" target="_blank" rel="noopener">彻底征服 Spring AOP 之 理论篇</a> 总结的很好； 本文将着重分析下 AOP 的实现过程。</p>
+<h2 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h2><h3 id="定义接口"><a href="#定义接口" class="headerlink" title="定义接口"></a>定义接口</h3><pre><code class="java">public interface UserService {
+    void say ();
+}
+</code></pre>
+<p>接口实现类如下：</p>
+<pre><code class="java">public class UserServiceImpl implements UserService {
+    public void say() {
+        System.out.println(&quot;do say method&quot;);
+    }
+}
+</code></pre>
+<h3 id="定义通知"><a href="#定义通知" class="headerlink" title="定义通知"></a>定义通知</h3><pre><code class="java">public class UserAdvice implements MethodBeforeAdvice {
+
+    public void before(Method m, Object[] args, Object target) throws Throwable {
+        System.out.println(&quot;do before advice ....&quot;);
+    }
+}
+</code></pre>
+<h3 id="配置-AOP"><a href="#配置-AOP" class="headerlink" title="配置 AOP"></a>配置 AOP</h3><pre><code class="xml">&lt;beans&gt;
+    &lt;!-- 配置接口实现类 --&gt;
+    &lt;bean id=&quot;userService&quot; class=&quot;org.springframework.aop.UserServiceImpl&quot; /&gt;
+
+    &lt;!-- 配置通知类 --&gt;
+    &lt;bean id=&quot;userAdvice&quot; class=&quot;org.springframework.aop.UserAdvice&quot; /&gt;
+
+    &lt;!--代理类--&gt;
+    &lt;bean id=&quot;userProxy&quot; class=&quot;org.springframework.aop.framework.ProxyFactoryBean&quot;&gt;
+        &lt;!--要代理的接口 创建代理对象时需要--&gt;
+        &lt;!-- 配置该属性会采用 jdk 动态代理，反之采用 cglib --&gt;
+        &lt;property name=&quot;proxyInterfaces&quot;&gt;
+            &lt;value&gt;org.springframework.aop.UserService&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;!--拦截器名字，也就是我们定义的通知类，可配置多个通知类 --&gt;
+        &lt;property name=&quot;interceptorNames&quot;&gt;
+            &lt;list&gt;
+                &lt;value&gt;userAdvice&lt;/value&gt;
+            &lt;/list&gt;
+        &lt;/property&gt;
+        &lt;!--目标类，就是我们业务的实现类--&gt;
+        &lt;property name=&quot;target&quot;&gt;
+            &lt;ref bean=&quot;userService&quot;/&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+&lt;/beans&gt;
+</code></pre>
+<h3 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h3><pre><code class="java">ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;/org/springframework/aop/aop.xml&quot;);
+
+UserService userService = (UserService) ctx.getBean(&quot;userProxy&quot;);
+
+userService.say();
+</code></pre>
+<p>执行结果如下：</p>
+<pre><code>do before advice ....
+do say method
+</code></pre><p>从执行结果来看，前置通知对接口方法已经起增强作用。 下面我们将看下 Spring AOP 的具体实现。</p>
+<h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><blockquote>
+<p>从上面的示例可以看出 Spring AOP 的配置主要基于类 <code>ProxyFactoryBean</code> ，那么我们就以此为入口去剖析其实现。</p>
+</blockquote>
+<h3 id="ProxyFactoryBean-类结构"><a href="#ProxyFactoryBean-类结构" class="headerlink" title="ProxyFactoryBean 类结构"></a>ProxyFactoryBean 类结构</h3><p><img src="https://user-gold-cdn.xitu.io/2019/3/3/1694244434983507?w=816&amp;h=245&amp;f=png&amp;s=9434" alt="ProxyFactoryBean"></p>
+<h3 id="创建切面链"><a href="#创建切面链" class="headerlink" title="创建切面链"></a>创建切面链</h3><p>从 <code>ProxyFactoryBean</code> 的类结构，我们发现其实现了接口 <code>BeanFactoryAware</code>，也就说明在其实例化过程中会调用方法 <code>setBeanFactory</code>; 源码如下：</p>
+<pre><code class="java">public void setBeanFactory(BeanFactory beanFactory) throws BeansException {
+    // 设置 beanFactory
+    this.beanFactory = beanFactory;
+    logger.debug(&quot;Set BeanFactory. Will configure interceptor beans...&quot;);
+    // 创建 advisor chain
+    createAdvisorChain();
+    logger.info(&quot;ProxyFactoryBean config: &quot; + this);
+    if (singleton) {
+        // Eagerly initialize the shared singleton instance
+        getSingletonInstance();
+        // We must listen to superclass advice change events to recache singleton
+        // instance if necessary
+        addListener(this);
+    }
+}
+</code></pre>
+<p>在 <code>setBeanFactory</code> 方法中除了设置 <code>beanFactory</code> , 还有一个重要的动作就是 <code>createAdvisorChain</code> 创建 advisor chain (也可以理解为就是切面链)。 那么下面我们将看下具体是怎样创建 advisor chain 的。</p>
+<pre><code class="java">private void createAdvisorChain() throws AopConfigException, BeansException {
+    // 检测是否配置了 interceptorNames, 也就是是否配置相关 advice 通知； 若没有配置直接返回
+    if (this.interceptorNames == null || this.interceptorNames.length == 0) {
+        //throw new AopConfigException(&quot;Interceptor names are required&quot;);
+        return;
+    }
+
+    // Globals can&#39;t be last
+    if (this.interceptorNames[this.interceptorNames.length - 1].endsWith(GLOBAL_SUFFIX)) {
+        throw new AopConfigException(&quot;Target required after globals&quot;);
+    }
+
+    // Materialize interceptor chain from bean names
+    for (int i = 0; i &lt; this.interceptorNames.length; i++) {
+        String name = this.interceptorNames[i];
+        logger.debug(&quot;Configuring interceptor &#39;&quot; + name + &quot;&#39;&quot;);
+        // 判断 interceptor name 是否以 * 结尾
+        if (name.endsWith(GLOBAL_SUFFIX)) {
+            if (!(this.beanFactory instanceof ListableBeanFactory)) {
+                throw new AopConfigException(&quot;Can only use global advisors or interceptors with a ListableBeanFactory&quot;);
+            }
+            else {
+                addGlobalAdvisor((ListableBeanFactory) this.beanFactory,
+                                 name.substring(0, name.length() - GLOBAL_SUFFIX.length()));
+            }
+        }
+        else {
+            // add a named interceptor
+            // 获取 advice bean
+            Object advice = this.beanFactory.getBean(this.interceptorNames[i]);
+            // 将 advisor 加入到链表中
+            addAdvisor(advice, this.interceptorNames[i]);
+        }
+    }
+}
+</code></pre>
+<pre><code class="java">private void addAdvisor(Object next, String name) {
+    logger.debug(&quot;Adding advisor or TargetSource [&quot; + next + &quot;] with name [&quot; + name + &quot;]&quot;);
+    // We need to add a method pointcut so that our source reference matches
+    // what we find from superclass interceptors.
+    // 查找 advice 通知匹配的 pointcut, 并创建一个 advisor
+    Object advisor = namedBeanToAdvisorOrTargetSource(next);
+    if (advisor instanceof Advisor) {
+        // if it wasn&#39;t just updating the TargetSource
+        logger.debug(&quot;Adding advisor with name [&quot; + name + &quot;]&quot;);
+        addAdvisor((Advisor) advisor);
+        this.sourceMap.put(advisor, name);
+    }
+    else {
+        logger.debug(&quot;Adding TargetSource [&quot; + advisor + &quot;] with name [&quot; + name + &quot;]&quot;);
+        setTargetSource((TargetSource) advisor);
+        // save target name
+        this.targetName = name;
+    }
+}
+</code></pre>
+<p>从 <code>addAdvisor</code> 方法可以看到，在添加 advisor 前，需要先创建 advisor , 会调用方法 <code>namedBeanToAdvisorOrTargetSource</code></p>
+<pre><code class="java">private Object namedBeanToAdvisorOrTargetSource(Object next) {
+    try {
+        // 将 advice 包装成一个 advisor
+        Advisor adv = GlobalAdvisorAdapterRegistry.getInstance().wrap(next);
+        return adv;
+    }
+    catch (UnknownAdviceTypeException ex) {
+
+    }
+}
+</code></pre>
+<p><code>namedBeanToAdvisorOrTargetSource</code> 方法会调用单例模式的 <code>GlobalAdvisorAdapterRegistry</code> 的方法 <code>wrap</code> 将 advice 包装成一个 advisor;<br>在查看 <code>wrap</code> 的实现之前，我们可以先看下 <code>GlobalAdvisorAdapterRegistry</code> 是做什么的。</p>
+<pre><code class="java">public class GlobalAdvisorAdapterRegistry extends DefaultAdvisorAdapterRegistry {
+
+    private static GlobalAdvisorAdapterRegistry instance = new GlobalAdvisorAdapterRegistry();
+
+    public static GlobalAdvisorAdapterRegistry getInstance() {
+        return instance;
+    }
+
+    private GlobalAdvisorAdapterRegistry() {
+    }    
+}
+
+public class DefaultAdvisorAdapterRegistry implements AdvisorAdapterRegistry {
+
+    private List adapters = new LinkedList();
+
+    public DefaultAdvisorAdapterRegistry() {
+        // register well-known adapters
+        registerAdvisorAdapter(new BeforeAdviceAdapter());
+        registerAdvisorAdapter(new AfterReturningAdviceAdapter());
+        registerAdvisorAdapter(new ThrowsAdviceAdapter());
+    }
+}
+</code></pre>
+<p>从上面 <code>GlobalAdvisorAdapterRegistry</code> 的实现可以看出其采用了单例模式并继承了类 <code>DefaultAdvisorAdapterRegistry</code> 在构造的过程中内置了 3 种 advice adapter 用于匹配 advice 。 下面我们在看下它是如何 <code>wrap</code> 包装 advice 的。</p>
+<pre><code class="java">public Advisor wrap(Object adviceObject) throws UnknownAdviceTypeException {
+    if (adviceObject instanceof Advisor) {
+        return (Advisor) adviceObject;
+    }
+
+    if (!(adviceObject instanceof Advice)) {
+        throw new UnknownAdviceTypeException(adviceObject);
+    }
+    Advice advice = (Advice) adviceObject;
+
+    if (advice instanceof Interceptor) {
+        // So well-known it doesn&#39;t even need an adapter
+        return new DefaultPointcutAdvisor(advice);
+    }
+
+    // 遍历内置的 advice adapters
+    for (int i = 0; i &lt; this.adapters.size(); i++) {
+        // Check that it is supported
+        AdvisorAdapter adapter = (AdvisorAdapter) this.adapters.get(i);
+        // 判断当前 adapter 是否支付当前 advice
+        if (adapter.supportsAdvice(advice)) {
+            // 如果支持的话，返回一个 DefaultPointcutAdvisor
+            return new DefaultPointcutAdvisor(advice);
+        }
+    }
+    throw new UnknownAdviceTypeException(advice);
+}
+</code></pre>
+<p>从 <code>wrap</code> 的实现可以发现，若 advice 匹配了某个 adapter 将会创建一个 <code>DefaultPointcutAdvisor</code> 实例并返回；</p>
+<pre><code class="java">public class DefaultPointcutAdvisor implements PointcutAdvisor, Ordered {
+
+    private int order = Integer.MAX_VALUE;
+
+    private Pointcut pointcut;
+
+    private Advice advice;
+
+    public DefaultPointcutAdvisor() {
+    }
+
+    public DefaultPointcutAdvisor(Advice advice) {
+        this(Pointcut.TRUE, advice);
+    }
+
+    public DefaultPointcutAdvisor(Pointcut pointcut, Advice advice) {
+        this.pointcut = pointcut;
+        this.advice = advice;
+    }
+}
+
+/**
+ * Canonical instance that matches everything.
+ * 默认匹配所有的类及类下的所有方法
+ */
+Pointcut TRUE = new Pointcut() {
+
+    public ClassFilter getClassFilter() {
+        return ClassFilter.TRUE;
+    }
+
+    public MethodMatcher getMethodMatcher() {
+        return MethodMatcher.TRUE;
+    }
+
+    public String toString() {
+        return &quot;Pointcut.TRUE&quot;;
+    }
+};
+</code></pre>
+<p>从 <code>DefaultPointcutAdvisor</code> 的实例可以看出创建 advisor (切面) 的过程实际就是将 advice (通知) 和 pointcut (切入点) 绑定的过程；同时在 Spring AOP 默认的 pointcut 是拦截所有类下的所有方法。</p>
+<blockquote>
+<p>简单点说也就是当前切面将会拦截哪些类下的哪些方法，拦截过程中会采用哪些增强处理（前置通知，返回通知，异常通知）。</p>
+</blockquote>
+<p>至此 advisor chain 的创建流程结束，其过程大概如下：</p>
+<ul>
+<li>遍历 interceptor names (也就是 advice 通知)</li>
+<li>获取 advice bean</li>
+<li>判断 advice 是否匹配内置的 advisorAdapter, 匹配的话则创建 DefaultPointcutAdvisor (默认拦截所有类所有方法) 加入到链表中</li>
+</ul>
+<h3 id="创建目标代理对象"><a href="#创建目标代理对象" class="headerlink" title="创建目标代理对象"></a>创建目标代理对象</h3><p>从 <code>ProxyFactoryBean</code> 类的名字及类结构，发现其实现接口 <code>FactoryBean</code>, 也就是说当其 <code>getBean</code> 的时候会调用方法 <code>getObject</code>, 源码如下：</p>
+<pre><code class="java">public Object getObject() throws BeansException {
+    // 默认单例
+    return (this.singleton) ? getSingletonInstance() : newPrototypeInstance();
+}
+
+private Object getSingletonInstance() {
+    if (this.singletonInstance == null) {
+        // This object can configure the proxy directly if it&#39;s
+        // being used as a singleton.
+        this.singletonInstance = createAopProxy().getProxy();
+    }
+    return this.singletonInstance;
+}
+
+protected synchronized AopProxy createAopProxy() {
+    if (!isActive) {
+        activate();
+    }
+
+    return getAopProxyFactory().createAopProxy(this);
+}
+</code></pre>
+<pre><code class="java">public AopProxy createAopProxy(AdvisedSupport advisedSupport) throws AopConfigException {
+    // 是否采用 cglib 代理
+    boolean useCglib = advisedSupport.getOptimize() || advisedSupport.getProxyTargetClass() || advisedSupport.getProxiedInterfaces().length == 0;
+    if (useCglib) {
+        return CglibProxyFactory.createCglibProxy(advisedSupport);
+    }
+    else {
+        // Depends on whether we have expose proxy or frozen or static ts
+        return new JdkDynamicAopProxy(advisedSupport);
+    }
+}
+</code></pre>
+<pre><code class="java">public Object getProxy(ClassLoader cl) {
+    logger.debug(&quot;Creating JDK dynamic proxy&quot;);
+    Class[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(this.advised);
+    return Proxy.newProxyInstance(cl, proxiedInterfaces, this);
+}
+</code></pre>
+<blockquote>
+<p><code>ProxyFactoryBean</code> 通过判断 proxyTargetClass , interfaceNames 的配置去选择采用 cglib 或者 jdk 来创建目标代理对象。</p>
+</blockquote>
+<h3 id="目标代理对象执行"><a href="#目标代理对象执行" class="headerlink" title="目标代理对象执行"></a>目标代理对象执行</h3><p>上面简单介绍了代理对象的创建，那么在看下当我们调用目标方法的时候，代理是如何执行的，以 jdk 动态代理为例：</p>
+<pre><code class="java">public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+
+    MethodInvocation invocation = null;
+    Object oldProxy = null;
+    boolean setProxyContext = false;
+
+    TargetSource targetSource = advised.targetSource;
+    Class targetClass = null;
+    Object target = null;        
+
+    try {
+        // Try special rules for equals() method and implementation of the
+        // Advised AOP configuration interface
+
+        // Short-circuit expensive Method.equals() call, as Object.equals() isn&#39;t overloaded
+        if (method.getDeclaringClass() == Object.class &amp;&amp; &quot;equals&quot;.equals(method.getName())) {
+            // What if equals throws exception!?
+
+            // This class implements the equals() method itself
+            return new Boolean(equals(args[0]));
+        }
+        else if (Advised.class == method.getDeclaringClass()) {
+            // Service invocations on ProxyConfig with the proxy config
+            return AopProxyUtils.invokeJoinpointUsingReflection(this.advised, method, args);
+        }
+
+        Object retVal = null;
+
+        // May be null. Get as late as possible to minimize the time we &quot;own&quot; the target,
+        // in case it comes from a pool.
+        // 目标实现类
+        target = targetSource.getTarget();
+        if (target != null) {
+            targetClass = target.getClass();
+        }
+
+        if (this.advised.exposeProxy) {
+            // Make invocation available if necessary
+            oldProxy = AopContext.setCurrentProxy(proxy);
+            setProxyContext = true;
+        }
+
+        // Get the interception chain for this method
+        // 获取目标类，执行方法的 interception chain
+        List chain = this.advised.advisorChainFactory.getInterceptorsAndDynamicInterceptionAdvice(
+                this.advised, proxy, method, targetClass);
+
+        // Check whether we have any advice. If we don&#39;t, we can fallback on
+        // direct reflective invocation of the target, and avoid creating a MethodInvocation
+        if (chain.isEmpty()) {
+            // We can skip creating a MethodInvocation: just invoke the target directly
+            // Note that the final invoker must be an InvokerInterceptor so we know it does
+            // nothing but a reflective operation on the target, and no hot swapping or fancy proxying
+            retVal = AopProxyUtils.invokeJoinpointUsingReflection(target, method, args);
+        }
+        else {
+
+            invocation = new ReflectiveMethodInvocation(proxy, target,
+                                method, args, targetClass, chain);
+
+            // Proceed to the joinpoint through the interceptor chain
+            // 方法调用
+            retVal = invocation.proceed();
+        }
+
+        // Massage return value if necessary
+        if (retVal != null &amp;&amp; retVal == target) {
+            retVal = proxy;
+        }
+        return retVal;
+    }
+    finally {
+    }
+}
+
+</code></pre>
+<p>首先我们看下如何获取匹配当前 method 的拦截器, 参考 <code>calculateInterceptorsAndDynamicInterceptionAdvice</code> 的实现如下：</p>
+<pre><code class="java">public static List calculateInterceptorsAndDynamicInterceptionAdvice(Advised config, Object proxy, Method method, Class targetClass) {
+    // 用于存储拦截器
+    List interceptors = new ArrayList(config.getAdvisors().length);
+    // 遍历 advisor (切面)
+    for (int i = 0; i &lt; config.getAdvisors().length; i++) {
+        Advisor advisor = config.getAdvisors()[i];
+        if (advisor instanceof PointcutAdvisor) {
+            // Add it conditionally
+            PointcutAdvisor pointcutAdvisor = (PointcutAdvisor) advisor;
+            // 判断当前 target class 是否当前 pointcut
+            if (pointcutAdvisor.getPointcut().getClassFilter().matches(targetClass)) {
+                // 获取 advisor 对应的 method interceptor 
+                MethodInterceptor interceptor = (MethodInterceptor) GlobalAdvisorAdapterRegistry.getInstance().getInterceptor(advisor);
+                MethodMatcher mm = pointcutAdvisor.getPointcut().getMethodMatcher();
+                // 判断当前 method 是否匹配 pointcut
+                if (mm.matches(method, targetClass)) {
+                    if (mm.isRuntime()) {
+                        // Creating a new object instance in the getInterceptor() method
+                        // isn&#39;t a problem as we normally cache created chains
+                        interceptors.add(new InterceptorAndDynamicMethodMatcher(interceptor, mm) );
+                    }
+                    else {                            
+                        // 将拦截器加入链表中
+                        interceptors.add(interceptor);
+                    }
+                }
+            }
+        }
+        else if (advisor instanceof IntroductionAdvisor) {
+            IntroductionAdvisor ia = (IntroductionAdvisor) advisor;
+            if (ia.getClassFilter().matches(targetClass)) {
+                MethodInterceptor interceptor = (MethodInterceptor) GlobalAdvisorAdapterRegistry.getInstance().getInterceptor(advisor);
+                interceptors.add(interceptor);
+            }
+        }
+    }    // for
+    return interceptors;
+}    // calculateInterceptorsAndDynamicInterceptionAdvice
+
+</code></pre>
+<p>我们在详细看下如何查找 advisor 匹配的拦截器呢，同样与上文中 <code>wrap</code> 类似，如下：</p>
+<pre><code class="java">public Interceptor getInterceptor(Advisor advisor) throws UnknownAdviceTypeException {
+    Advice advice = advisor.getAdvice();
+    if (advice instanceof Interceptor) {
+        return (Interceptor) advice;
+    }
+
+    // 遍历内置的 advisor adapter
+    for (int i = 0; i &lt; this.adapters.size(); i++) {
+        AdvisorAdapter adapter = (AdvisorAdapter) this.adapters.get(i);
+        // 是否匹配当前 advice
+        if (adapter.supportsAdvice(advice)) {
+            // 匹配的话返回 interceptor
+            return adapter.getInterceptor(advisor);
+        }
+    }
+    throw new UnknownAdviceTypeException(advisor.getAdvice());
+}
+</code></pre>
+<p>到目前为止，我们多次发现 <code>AdvisorAdapter</code> 的身影，下面我们看下其具体的实现, 以 <code>BeforeAdviceAdapter</code> 为例：</p>
+<pre><code class="java">class BeforeAdviceAdapter implements AdvisorAdapter {
+
+    /**
+     * @see org.springframework.aop.framework.adapter.AdvisorAdapter#supportsAdvice(java.lang.Object)
+     */
+    public boolean supportsAdvice(Advice advice) {
+        // 匹配 MethodBeforeAdvice
+        return advice instanceof MethodBeforeAdvice;
+    }
+
+    /**
+     * @see org.springframework.aop.framework.adapter.AdvisorAdapter#getInterceptor(org.springframework.aop.Advisor)
+     */
+    public Interceptor getInterceptor(Advisor advisor) {
+        MethodBeforeAdvice advice = (MethodBeforeAdvice) advisor.getAdvice();
+        // 返回 MethodBeforeAdviceInterceptor
+        return new MethodBeforeAdviceInterceptor(advice) ;
+    }
+
+}
+</code></pre>
+<blockquote>
+<p>通过 <code>AdvisorAdapter</code> 很巧妙的将 Advice 和 Interceptor 结合起来，同时也会发现二者关系是一一对应的</p>
+</blockquote>
+<p>下面在看下方法的真正调用过程, 由 <code>ReflectiveMethodInvocation</code> 的方法 <code>proceed</code> 实现：</p>
+<pre><code class="java">public Object proceed() throws Throwable {
+    //    We start with an index of -1 and increment early
+    // 当执行到最后一个拦截器的时候将会调用目标方法
+    if (this.currentInterceptorIndex == this.interceptorsAndDynamicMethodMatchers.size() - 1) {
+        return invokeJoinpoint();
+    }
+
+    // 获取下一个拦截器
+    Object interceptorOrInterceptionAdvice = this.interceptorsAndDynamicMethodMatchers.get(++this.currentInterceptorIndex);
+    if (interceptorOrInterceptionAdvice instanceof InterceptorAndDynamicMethodMatcher) {
+        // Evaluate dynamic method matcher here: static part will already have
+        // been evaluated and found to match
+        InterceptorAndDynamicMethodMatcher dm = (InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;
+        if (dm.methodMatcher.matches(this.method, this.targetClass, this.arguments)) {
+            return dm.interceptor.invoke(this);
+        }
+        else {
+            // Dynamic matching failed
+            // Skip this interceptor and invoke the next in the chain
+            return proceed();
+        }
+    }
+    else {
+        // It&#39;s an interceptor so we just invoke it: the pointcut will have
+        // been evaluated statically before this object was constructed
+        // 执行拦截器
+        return ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(this);
+    }
+}
+</code></pre>
+<p>下面具体看下 <code>MethodInterceptor</code> 的实现，分别是前置通知，返回通知，异常通知</p>
+<pre><code class="java">public Object invoke(MethodInvocation mi) throws Throwable {
+    // 目标方法前执行
+    advice.before(mi.getMethod(), mi.getArguments(), mi.getThis() );
+    return mi.proceed();
+}
+
+public Object invoke(MethodInvocation mi) throws Throwable {
+    // 先执行目标方法
+    Object retval = mi.proceed();
+    // 后置处理
+    advice.afterReturning(retval, mi.getMethod(), mi.getArguments(), mi.getThis() );
+    return retval;
+}
+
+public Object invoke(MethodInvocation mi) throws Throwable {
+    try {
+        // 执行目标方法
+        return mi.proceed();
+    }
+    catch (Throwable t) {
+        // 异常处理
+        Method handlerMethod = getExceptionHandler(t);
+        if (handlerMethod != null) {
+            invokeHandlerMethod(mi, t, handlerMethod);
+        }
+        throw t;
+    }
+}
+</code></pre>
+<p>至此 Spring AOP 代理对象的执行过程处理结束，其流程可大概总结如下：</p>
+<ul>
+<li>获取当前目标方法的 interceptor chain<ol>
+<li>遍历 advisor ，判断当前目标类和目标方法是否匹配 advisor 对应的 ponitcut</li>
+<li>通过匹配的 advisor 对应的 advice 匹配对应的 advisorAdapter , 进而获取对应的 methodInterceptor</li>
+</ol>
+</li>
+<li>执行拦截器</li>
+<li>执行目标方法</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>Spring AOP 中的对象关系小结下：</p>
+<ul>
+<li>Advisor : 翻译是顾问，简单理解其就是一个 Aspect (切面); 其内部绑定了对应的 Pointcut(切入点) 和 Advice(通知)。</li>
+<li>Advisor Chain ： 切面链，是一系列的切面的集合。</li>
+<li>Advice : 通知，是对拦截方法的增强处理；在 1.0 版本中包含 BeforeAdivce, AfterReturningAdvice, ThrowsAdvice; 其面向的是用户。</li>
+<li>MethodInterceptor : 方法拦截器，是 Advice 的执行者; 与 Advice 是一一对应的。</li>
+<li>AdvisorAdapter : Advice 的适配器，是 Advice 和 MethodInterceptor 匹配的纽带。</li>
+<li>AdvisorAdapterRegistry : 是 AdvisorAdapter 的注册中心，内置了 BeforeAdviceAdapter, AfterReturnAdviceAdapter, ThrowsAdviceAdapter； 用来将 Advice wrap 成一个 Advisor 并提供获取 Advice 对应的 MethodInterceptor。</li>
+</ul>
+<h3 id="坑"><a href="#坑" class="headerlink" title="坑"></a>坑</h3><p>当我们自定义 Advice 时，可不可以同时支持多种 Advice 呢 ？ 譬如：</p>
+<pre><code class="java">public class UserAdvice implements MethodBeforeAdvice, AfterReturningAdvice {
+
+    public void before(Method m, Object[] args, Object target) throws Throwable {
+        System.out.println(&quot;do before advice ....&quot;);
+    }
+
+    public void afterReturning(Object returnValue, Method m, Object[] args, Object target) throws Throwable {
+        System.out.println(&quot;do after returning ....&quot;);
+    }
+}
+</code></pre>
+<p>那么当测试后，您会发现只有 before 调用了，而 afterReturning 未调用了；这是为什么呢 ? (好好看源码额)</p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;Spring</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

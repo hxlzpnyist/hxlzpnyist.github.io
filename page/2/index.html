@@ -97,6 +97,37 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/12/13/ReentrantReadWriteLock-读写锁/" class="h3 title" target="_self">ReentrantReadWriteLock-读写锁源码分析</a>
+                    
+                    <p>ReentrantReadWriteLock 读写锁
+读写锁不同于 ReentrantLock ，ReentrantLock 是排他锁同一时刻只允许一个线程访问，而读写锁同一时刻允许多个读线程访问，但是在写线程操作时，所有的读写操作均被阻塞。
+
+读写状态实现
+如何通过一个 int 值记录读状态，写状态呢 ?
+
+在 ReentrantReadWrit...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-13
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2018/12/11/ReentrantLock-重入锁源码分析/" class="h3 title" target="_self">ReentrantLock-重入锁源码分析</a>
                     
                     <p>ReentrantLock
@@ -346,27 +377,6 @@ Condition 的创建    Lock lock = new ReentrantLock();
                                 
                                     数据结构 &nbsp;
                                 
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/03/05/Jdk之HashMap/" class="h3 title" target="_self">Jdk之HashMap</a>
-                    
-                    <p>概述HashMap 是散列表的一种基于拉链法的实现方式。
-本文先看下 HashMap 的迭代实现方式
-    private abstract class HashIterator&lt;E&gt; implements Iterator&lt;E&gt; {
-        Entry&lt;K,V&gt; next;        // nex...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-05
                         
                     </p>
                     
