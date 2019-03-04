@@ -342,21 +342,25 @@ ServerSocketChannel 通道注册到 selector 并监听 accept 事件
             
             
                 <div class="col-md-11">
-                    <a href="/2018/01/08/Jdk之ReentrantLock源码分析/" class="h3 title" target="_self">Jdk之ReentrantLock源码分析</a>
+                    <a href="/2017/12/22/zookeeper源码阅读之watch/" class="h3 title" target="_self">zookeeper源码阅读之watch</a>
                     
-                    <p>概述ReentrantLock 是重入锁，也就是说支持重新进入的锁，也表示同一线程在获取锁之后可以再次获取锁。
+                    <p>watcher 流程概述watcher 用来客户端监听某一节点的特性变化，执行对应的操作. 从下图可以看出 watcher 的流程主要包括:
 
-synchronizer 关键字是隐式的支持重进入的，比如说采用 synchronizer 修饰的递归方法，在方法执行时，执行线程在获取锁之后依然可以连续多次获得锁。
 
-ReentrantLock 支持获取锁时的公平和非公平性的选择，默认为非公平性锁。...</p>
+
+watcher 注册, 包括客户端注册, 服务端的注册
+watcher 触发
+watcher 执行
+
+...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-08
+                        <i class="material-icons">date_range</i>2017-12-22
                         
                             <i class="material-icons">bookmark_border</i>
                                 
-                                    jdk &nbsp;
+                                    zookeeper &nbsp;
                                 
                         
                     </p>
