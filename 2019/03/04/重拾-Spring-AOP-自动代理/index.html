@@ -99,7 +99,7 @@
       <div class="container">
         <div class="section">
           <div class="post_content">
-              <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p><code>ProxyFactoryBean</code> 只能代理一个目标对象 bean, 当代理目标类过多时，配置文件臃肿不方便管理维护，Spring 提供了能够实现自动创建代理的类 <code>BeanNameAutoProxyCreator</code> , <code>DefaultAdvisorAutoProxyCreator</code> 。</p>
+              <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在上一篇 <code>重拾-Spring AOP</code> 中我们会发现 Spring AOP 是通过类 <code>ProxyFactoryBean</code> 创建代理对象，其有个缺陷就是只能代理一个目标对象 bean, 当代理目标类过多时，配置文件臃肿不方便管理维护，因此 Spring 提供了能够实现自动创建代理的类 <code>BeanNameAutoProxyCreator</code> , <code>DefaultAdvisorAutoProxyCreator</code> ；下面我们看下二者是如何实现自动代理的。</p>
 <h2 id="BeanNameAutoProxyCreator"><a href="#BeanNameAutoProxyCreator" class="headerlink" title="BeanNameAutoProxyCreator"></a>BeanNameAutoProxyCreator</h2><blockquote>
 <p><code>BeanNameAutoProxyCreator</code> 是通过判断当前 bean name 是否匹配，只有匹配的 bean 才会创建代理。</p>
 </blockquote>
@@ -245,8 +245,260 @@ do after return advice ....
             (mappedName.startsWith(&quot;*&quot;) &amp;&amp; beanName.endsWith(mappedName.substring(1, mappedName.length())));
 }
 </code></pre>
-<p>自动代理流程：</p>
-<h2 id="DefaultAdvisorAutoProxyCreator"><a href="#DefaultAdvisorAutoProxyCreator" class="headerlink" title="DefaultAdvisorAutoProxyCreator"></a>DefaultAdvisorAutoProxyCreator</h2><h3 id="使用示例-1"><a href="#使用示例-1" class="headerlink" title="使用示例"></a>使用示例</h3><h3 id="实现分析-1"><a href="#实现分析-1" class="headerlink" title="实现分析"></a>实现分析</h3>
+<p>从 <code>BeanNameAutoProxyCreator</code> 的源码大概总结其自动代理流程：</p>
+<ul>
+<li>判断当前 bean name 是否匹配配置</li>
+<li>加载配置的 advisor, 也就是配置的 interceptorNames</li>
+<li>采用 jdk 动态代理创建 bean 的代理对象</li>
+</ul>
+<h2 id="DefaultAdvisorAutoProxyCreator"><a href="#DefaultAdvisorAutoProxyCreator" class="headerlink" title="DefaultAdvisorAutoProxyCreator"></a>DefaultAdvisorAutoProxyCreator</h2><blockquote>
+<p><code>DefaultAdvisorAutoProxyCreator</code> 会搜索 <code>BeanFactory</code> 容器内部所有可用的 <code>Advisor</code>; 并为容器中匹配的 bean 创建代理。 在上一篇 <code>重拾-Spring AOP</code> 中我们知道 Spring AOP 会默认创建实例为 <code>DefaultPointcutAdvisor</code> 的 <code>Advisor</code>； 那么在分析 <code>DefaultAdvisorAutoProxyCreator</code> 之前，我们看下 Spring AOP 还为我们提供了哪些内置的 <code>Advisor</code> 。</p>
+</blockquote>
+<h4 id="NameMatchMethodPointcutAdvisor"><a href="#NameMatchMethodPointcutAdvisor" class="headerlink" title="NameMatchMethodPointcutAdvisor"></a>NameMatchMethodPointcutAdvisor</h4><blockquote>
+<p><code>NameMatchMethodPointcutAdvisor</code> 是按 method name 匹配，只有当目标类执行方法匹配的时候，才会执行 <code>Advice</code></p>
+</blockquote>
+<pre><code class="java">public class NameMatchMethodPointcut extends StaticMethodMatcherPointcut {
+
+    // 配置拦截的 method name
+    private String[] mappedNames = new String[0];
+
+    public boolean matches(Method m, Class targetClass) {
+        for (int i = 0; i&lt;this.mappedNames.length; i++) {
+            String mappedName = this.mappedNames[i];
+            // 目标方法是否与配置的 method name 相等；或者匹配通配符
+            if (mappedName.equals(m.getName()) || isMatch(m.getName(), mappedName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // 是否以 * 开头或结束并匹配
+    protected boolean isMatch(String methodName, String mappedName) {
+        return (mappedName.endsWith(&quot;*&quot;) &amp;&amp; methodName.startsWith(mappedName.substring(0, mappedName.length() - 1))) ||
+                (mappedName.startsWith(&quot;*&quot;) &amp;&amp; methodName.endsWith(mappedName.substring(1, mappedName.length())));
+    }
+
+}
+</code></pre>
+<h4 id="RegexpMethodPointcutAdvisor"><a href="#RegexpMethodPointcutAdvisor" class="headerlink" title="RegexpMethodPointcutAdvisor"></a>RegexpMethodPointcutAdvisor</h4><blockquote>
+<p><code>RegexpMethodPointcutAdvisor</code> 是按照正则表达式匹配方法，能够精确定位到需要拦截的方法。</p>
+</blockquote>
+<pre><code class="java">public class RegexpMethodPointcut extends StaticMethodMatcherPointcut implements ClassFilter { 
+
+    public boolean matches(Method m, Class targetClass) { 
+        // TODO use target class here?
+        // 拼接表达式
+        String patt = m.getDeclaringClass().getName() + &quot;.&quot; + m.getName();
+        for (int i = 0; i &lt; this.compiledPatterns.length; i++) {
+            // 正则匹配
+            boolean matched = this.matcher.matches(patt, this.compiledPatterns[i]);
+            if (logger.isDebugEnabled()) {
+                logger.debug(&quot;Candidate is: &#39;&quot; + patt + &quot;&#39;; pattern is &quot; + this.compiledPatterns[i].getPattern() +
+                             &quot;; matched=&quot; + matched);
+            }
+            if (matched) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean matches(Class clazz) {
+        // TODO do with regexp
+        return true;
+    }
+
+    public ClassFilter getClassFilter() {
+        return this;
+    }
+
+}
+</code></pre>
+<h3 id="使用示例-1"><a href="#使用示例-1" class="headerlink" title="使用示例"></a>使用示例</h3><ul>
+<li>xml 配置</li>
+</ul>
+<pre><code class="xml">&lt;beans&gt;
+
+    &lt;bean id=&quot;userService&quot; class=&quot;org.springframework.aop.UserServiceImpl&quot; /&gt;
+    &lt;bean id=&quot;demoService&quot; class=&quot;org.springframework.aop.DemoServiceImpl&quot; /&gt;
+
+    &lt;bean id=&quot;userBeforeAdvice&quot; class=&quot;org.springframework.aop.UserBeforeAdvice&quot; /&gt;
+    &lt;bean id=&quot;userAfterAdvice&quot; class=&quot;org.springframework.aop.UserAfterAdvice&quot; /&gt;
+
+    &lt;!-- 按方法名称匹配 --&gt;
+    &lt;bean id=&quot;nameMatchMethodPointcutAdvisor&quot; class=&quot;org.springframework.aop.support.NameMatchMethodPointcutAdvisor&quot;&gt;
+        &lt;property name=&quot;mappedNames&quot;&gt;
+            &lt;!-- 匹配 save 开头的方法 --&gt;
+            &lt;value&gt;save*&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;advice&quot;&gt;
+            &lt;ref bean=&quot;userBeforeAdvice&quot; /&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;regexpMethodPointcutAdvisor&quot; class=&quot;org.springframework.aop.support.RegexpMethodPointcutAdvisor&quot;&gt;
+        &lt;property name=&quot;pattern&quot;&gt;
+            &lt;!-- 匹配以 del 开头的方法 --&gt;
+            &lt;value&gt;org.springframework.aop.*.del*.*&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;advice&quot;&gt;
+            &lt;ref bean=&quot;userAfterAdvice&quot; /&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean class=&quot;org.springframework.aop.framework.autoproxy.DefaultAdvisorAutoProxyCreator&quot; /&gt;
+&lt;/beans&gt;
+</code></pre>
+<ul>
+<li>测试</li>
+</ul>
+<pre><code class="java">ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;/org/springframework/aop/aop.xml&quot;);
+
+UserService userService = (UserService) ctx.getBean(&quot;userService&quot;);
+
+userService.saveUser();
+
+userService.delUser();
+
+DemoService demoService = (DemoService) ctx.getBean(&quot;demoService&quot;);
+
+demoService.saveDemo();
+
+demoService.delDemo();
+</code></pre>
+<ul>
+<li>测试结果</li>
+</ul>
+<pre><code>do before advice ....
+do save user ......
+do del user ......
+do after return advice ....
+do before advice ....
+do save demo ......
+do del demo ......
+do after return advice ....
+</code></pre><blockquote>
+<p>从测试结果可以看出，通过配置不同 <code>Advisor</code> 匹配不同的 <code>Method</code> 采用相应的 <code>Advice</code> 进行处理。</p>
+</blockquote>
+<h3 id="实现分析-1"><a href="#实现分析-1" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构-1"><a href="#类结构-1" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://user-gold-cdn.xitu.io/2019/3/4/16949161074e79f6?w=732&amp;h=330&amp;f=png&amp;s=12834" alt="DefaultAdvisorAutoProxyCreator"></p>
+<p>从上图 <code>DefaultAdvisorAutoProxyCreator</code> 类结构，我们知道其实现与 <code>BeanNameAutoProxyCreator</code> 类似；都是通过实现接口 <code>BeanPostProcessor</code> 在 bean 完成实例化后进行自动代理处理。</p>
+<h5 id="分析-1"><a href="#分析-1" class="headerlink" title="分析"></a>分析</h5><p>因 <code>DefaultAdvisorAutoProxyCreator</code> 和 <code>BeanNameAutoProxyCreator</code> 都继承了类 <code>AbstractAutoProxyCreator</code> ,所以从源码中我们可以发现二者都重写了方法 <code>getInterceptorsAndAdvisorsForBean</code> ，也就是在获取当前 bean 所匹配的 <code>Advisor</code> 逻辑不一样之外其他处理一致； 那么下面针对 <code>DefaultAdvisorAutoProxyCreator</code> 的实现我们主要看下方法 <code>getInterceptorsAndAdvisorsForBean</code> 的处理。</p>
+<pre><code class="java">protected Object[] getInterceptorsAndAdvisorsForBean(Object bean, String name) {
+    // 查找与当前 bean 匹配的 advisor
+    List advices = findEligibleAdvisors(bean.getClass());
+    if (advices.isEmpty()) {
+        return DO_NOT_PROXY;
+    }
+    // 对 advisor 集合排序
+    advices = sortAdvisors(advices);
+    return advices.toArray();
+}
+</code></pre>
+<ul>
+<li>查找匹配的 Advisor</li>
+</ul>
+<pre><code class="java">protected List findEligibleAdvisors(Class clazz) {
+    // 查找当前容器中所有定义的 advisor
+    List candidateAdvice = findCandidateAdvisors();
+    List eligibleAdvice = new LinkedList();
+    for (int i = 0; i &lt; candidateAdvice.size(); i++) {
+        // Sun, give me generics, please!
+        Advisor candidate = (Advisor) candidateAdvice.get(i);
+        // 判断 bean 是否可以应用 advisor
+        if (AopUtils.canApply(candidate, clazz, null)) {
+            // 将 advisor 添加到匹配的集合中
+            eligibleAdvice.add(candidate);
+            logger.info(&quot;Candidate Advice [&quot; + candidate + &quot;] accepted for class [&quot; + clazz.getName() + &quot;]&quot;);
+        }
+        else {
+            logger.info(&quot;Candidate Advice [&quot; + candidate + &quot;] rejected for class [&quot; + clazz.getName() + &quot;]&quot;);
+        }
+    }
+    return eligibleAdvice;
+}
+</code></pre>
+<ul>
+<li>获取容器中所有的 Advisor</li>
+</ul>
+<pre><code class="java">protected List findCandidateAdvisors() {
+    if (!(getBeanFactory() instanceof ListableBeanFactory)) {
+        throw new IllegalStateException(&quot;Cannot use DefaultAdvisorAutoProxyCreator without a ListableBeanFactory&quot;);
+    }
+    ListableBeanFactory owningFactory = (ListableBeanFactory) getBeanFactory();
+    // 从容器中查找所有 bean 定义 type 为 Advisor 的 bean name
+    String[] adviceNames = BeanFactoryUtils.beanNamesIncludingAncestors(owningFactory, Advisor.class);
+    List candidateAdvisors = new LinkedList();
+    for (int i = 0; i &lt; adviceNames.length; i++) {
+        String name = adviceNames[i];
+        if (!this.usePrefix || name.startsWith(this.advisorBeanNamePrefix)) {
+            // 获取 advisor 实例
+            Advisor advisor = (Advisor) owningFactory.getBean(name);
+            candidateAdvisors.add(advisor);
+        }
+    }
+    return candidateAdvisors;
+}
+</code></pre>
+<ul>
+<li>判断 bean 是否匹配 Advisor</li>
+</ul>
+<pre><code class="java">public static boolean canApply(Advisor advisor, Class targetClass, Class[] proxyInterfaces) {
+    if (advisor instanceof IntroductionAdvisor) {
+        return ((IntroductionAdvisor) advisor).getClassFilter().matches(targetClass);
+    }
+    else if (advisor instanceof PointcutAdvisor) {
+        PointcutAdvisor pca = (PointcutAdvisor) advisor;
+        // 通过 advisor 的 pointcut 判断 bean 是否匹配
+        return canApply(pca.getPointcut(), targetClass, proxyInterfaces);
+    }
+    else {
+        // It doesn&#39;t have a pointcut so we assume it applies
+        return true;
+    }
+}
+
+
+public static boolean canApply(Pointcut pc, Class targetClass, Class[] proxyInterfaces) {
+    // 类是否匹配
+    if (!pc.getClassFilter().matches(targetClass)) {
+        return false;
+    }
+
+    // 判断类中的 method 是否匹配
+    // 获取类下所有的method
+    Method[] methods = targetClass.getMethods();
+    for (int i = 0; i &lt; methods.length; i++) {
+        Method m = methods[i];
+        // If we&#39;re looking only at interfaces and this method
+        // isn&#39;t on any of them, skip it
+        if (proxyInterfaces != null &amp;&amp; !methodIsOnOneOfTheseInterfaces(m, proxyInterfaces)) {
+            continue;
+        }
+        // 执行 pointcut 的 method match
+        if (pc.getMethodMatcher().matches(m, targetClass))
+            return true;
+    }
+    return false;
+}
+</code></pre>
+<p>从 <code>DefaultAdvisorAutoProxyCreator</code> 的源码分析，可知其自动代理流程大概如下：</p>
+<ul>
+<li>从容器中获取所有 <code>Advisor</code> 实例</li>
+<li>匹配 bean 所支持的 <code>Advisor</code></li>
+<li>采用 jdk 动态代理创建 bean 的代理对象</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>从 <code>BeanNameAutoProxyCreator</code>, <code>DefaultAdvisorAutoProxyCreator</code> 二者的实现可以看出其相同点</p>
+<ul>
+<li>都是基于实现接口 <code>BeanPostProcessor</code> 的实现</li>
+<li>都是先获取当前 bean 所匹配的 <code>Advisor</code>，后在创建代理对象</li>
+</ul>
+<p>二者的不同点在于:</p>
+<ul>
+<li>前者是基于 bean name 判断是否判断，后者是通过 <code>Advisor</code> 内部的 <code>Ponitcut</code> 匹配判断</li>
+<li>前者的 <code>Advisor</code> 是用户配置的，后者是容器中所有匹配的 <code>Advisor</code> </li>
+</ul>
+
           </div>
           <br><br>
           <div>
