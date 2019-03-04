@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>重拾-Spring AOP-自动代理 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">重拾-Spring AOP-自动代理</h1>
+        <p class="text-center"><b>星期一, 三月 4日 2019, 3:17 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p><code>ProxyFactoryBean</code> 只能代理一个目标对象 bean, 当代理目标类过多时，配置文件臃肿不方便管理维护，Spring 提供了能够实现自动创建代理的类 <code>BeanNameAutoProxyCreator</code> , <code>DefaultAdvisorAutoProxyCreator</code> 。</p>
+<h2 id="BeanNameAutoProxyCreator"><a href="#BeanNameAutoProxyCreator" class="headerlink" title="BeanNameAutoProxyCreator"></a>BeanNameAutoProxyCreator</h2><blockquote>
+<p><code>BeanNameAutoProxyCreator</code> 是通过判断当前 bean name 是否匹配，只有匹配的 bean 才会创建代理。</p>
+</blockquote>
+<h3 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h3><ul>
+<li>Spring xml 配置</li>
+</ul>
+<pre><code class="xml">&lt;bean id=&quot;userService&quot; class=&quot;org.springframework.aop.UserServiceImpl&quot; /&gt;
+&lt;bean id=&quot;demoService&quot; class=&quot;org.springframework.aop.DemoServiceImpl&quot; /&gt;
+
+&lt;bean id=&quot;userBeforeAdvice&quot; class=&quot;org.springframework.aop.UserBeforeAdvice&quot; /&gt;
+&lt;bean id=&quot;userAfterAdvice&quot; class=&quot;org.springframework.aop.UserAfterAdvice&quot; /&gt;
+
+&lt;bean id=&quot;beanNameAutoProxyCreator&quot; class=&quot;org.springframework.aop.framework.autoproxy.BeanNameAutoProxyCreator&quot;&gt;
+    &lt;!-- 配置要代理的 bean --&gt;
+    &lt;property name=&quot;beanNames&quot;&gt;
+        &lt;list&gt;
+            &lt;value&gt;userService&lt;/value&gt;
+            &lt;value&gt;demoService&lt;/value&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+    &lt;!-- 配置 interceptor, advice, advisor --&gt;
+    &lt;property name=&quot;interceptorNames&quot;&gt;
+        &lt;list&gt;
+            &lt;value&gt;userAfterAdvice&lt;/value&gt;
+            &lt;value&gt;userBeforeAdvice&lt;/value&gt;
+        &lt;/list&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</code></pre>
+<ul>
+<li>测试</li>
+</ul>
+<pre><code class="java">ClassPathXmlApplicationContext ctx = new ClassPathXmlApplicationContext(&quot;/org/springframework/aop/aop.xml&quot;);
+
+UserService userService = (UserService) ctx.getBean(&quot;userService&quot;);
+
+userService.say();
+
+DemoService demoService = (DemoService) ctx.getBean(&quot;demoService&quot;);
+
+demoService.demo();
+</code></pre>
+<ul>
+<li>运行结果</li>
+</ul>
+<pre><code>do before advice ....
+do say method
+do after return advice ....
+do before advice ....
+do demo.
+do after return advice ....
+</code></pre><h3 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://user-gold-cdn.xitu.io/2019/3/4/16947a2225df2140?w=732&amp;h=245&amp;f=png&amp;s=9139" alt="BeanNameAutoProxyCreator"></p>
+<p>如上图 <code>BeanNameAutoProxyCreator</code> 类结构可以看出，其实现了接口 <code>BeanPostProcessor</code> ; 那么我们可以大概猜测出其自动代理的实现原理与自动注入类似，都是在 bean 实例化后进行特殊的处理，下面就让我们看下源码验证下吧。</p>
+<h5 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h5><pre><code class="java">public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
+    // Check for special cases. We don&#39;t want to try to autoproxy a part of the autoproxying
+    // infrastructure, lest we get a stack overflow.
+    if (isInfrastructureClass(bean, name) || shouldSkip(bean, name)) {
+        logger.debug(&quot;Did not attempt to autoproxy infrastructure class &#39;&quot; + bean.getClass() + &quot;&#39;&quot;);
+        return bean;
+    }
+
+    TargetSource targetSource = getTargetSource(bean, name);
+
+    Object[] specificInterceptors = getInterceptorsAndAdvisorsForBean(bean, name);
+
+    // proxy if we have advice or if a TargetSourceCreator wants to do some
+    // fancy stuff such as pooling
+    if (specificInterceptors != DO_NOT_PROXY || !(targetSource instanceof SingletonTargetSource)) {
+
+        // handle prototypes correctly
+        // 获取容器中配置的 advisors 
+        Advisor[] commonInterceptors = resolveInterceptorNames();
+
+        List allInterceptors = new ArrayList();
+        if (specificInterceptors != null) {
+            allInterceptors.addAll(Arrays.asList(specificInterceptors));
+            if (commonInterceptors != null) {
+                if (this.applyCommonInterceptorsFirst) {
+                    allInterceptors.addAll(0, Arrays.asList(commonInterceptors));
+                }
+                else {
+                    allInterceptors.addAll(Arrays.asList(commonInterceptors));
+                }
+            }
+        }
+        if (logger.isInfoEnabled()) {
+            int nrOfCommonInterceptors = commonInterceptors != null ? commonInterceptors.length : 0;
+            int nrOfSpecificInterceptors = specificInterceptors != null ? specificInterceptors.length : 0;
+            logger.info(&quot;Creating implicit proxy for bean &#39;&quot; +  name + &quot;&#39; with &quot; + nrOfCommonInterceptors +
+                                    &quot; common interceptors and &quot; + nrOfSpecificInterceptors + &quot; specific interceptors&quot;);
+        }
+        ProxyFactory proxyFactory = new ProxyFactory();
+
+        // copy our properties (proxyTargetClass) inherited from ProxyConfig
+        proxyFactory.copyFrom(this);
+
+        if (!getProxyTargetClass()) {
+            // Must allow for introductions; can&#39;t just set interfaces to
+            // the target&#39;s interfaces only.
+            // 添加设置代理的接口
+            Class[] targetsInterfaces = AopUtils.getAllInterfaces(bean);
+            for (int i = 0; i &lt; targetsInterfaces.length; i++) {
+                proxyFactory.addInterface(targetsInterfaces[i]);
+            }
+        }
+
+        for (Iterator it = allInterceptors.iterator(); it.hasNext();) {
+            Advisor advisor = GlobalAdvisorAdapterRegistry.getInstance().wrap(it.next());
+            // 添加 advisor
+            proxyFactory.addAdvisor(advisor);
+        }
+        proxyFactory.setTargetSource(getTargetSource(bean, name));
+
+        // 创建代理对象，依旧采用的 jdk 动态代理; 因为上面设置了代理的 interface
+        return proxyFactory.getProxy();
+    }
+    else {
+        return bean;
+    }
+}
+</code></pre>
+<pre><code class="java">protected Object[] getInterceptorsAndAdvisorsForBean(Object bean, String beanName) {
+    if (this.beanNames != null) {
+        // bean name 包含在配置的名称列表中，说明需要代理
+        if (this.beanNames.contains(beanName)) {
+            return PROXY_WITHOUT_ADDITIONAL_INTERCEPTORS;
+        }
+        for (Iterator it = this.beanNames.iterator(); it.hasNext();) {
+            String mappedName = (String) it.next();
+            // bean name 匹配通配符，说明需要代理
+            if (isMatch(beanName, mappedName)) {
+                return PROXY_WITHOUT_ADDITIONAL_INTERCEPTORS;
+            }
+        }
+    }
+    // 说明 bean 不需要代理
+    return DO_NOT_PROXY;
+}
+</code></pre>
+<pre><code class="java">protected boolean isMatch(String beanName, String mappedName) {
+    // bean name 匹配通配符
+    return (mappedName.endsWith(&quot;*&quot;) &amp;&amp; beanName.startsWith(mappedName.substring(0, mappedName.length() - 1))) ||
+            (mappedName.startsWith(&quot;*&quot;) &amp;&amp; beanName.endsWith(mappedName.substring(1, mappedName.length())));
+}
+</code></pre>
+<p>自动代理流程：</p>
+<h2 id="DefaultAdvisorAutoProxyCreator"><a href="#DefaultAdvisorAutoProxyCreator" class="headerlink" title="DefaultAdvisorAutoProxyCreator"></a>DefaultAdvisorAutoProxyCreator</h2><h3 id="使用示例-1"><a href="#使用示例-1" class="headerlink" title="使用示例"></a>使用示例</h3><h3 id="实现分析-1"><a href="#实现分析-1" class="headerlink" title="实现分析"></a>实现分析</h3>
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;Spring</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>
