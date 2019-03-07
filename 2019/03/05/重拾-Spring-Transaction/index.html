@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>重拾-Spring Transaction ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">重拾-Spring Transaction</h1>
+        <p class="text-center"><b>星期二, 三月 5日 2019, 11:07 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="疑惑"><a href="#疑惑" class="headerlink" title="疑惑"></a>疑惑</h2><p>面试中是不是有时经常会被问到 “Spring 事务如何管理的了解吗？” “Spring 事务的传播性有哪些，都是怎么用的呢？”</p>
+<h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><h3 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h3><ul>
+<li>Spring 配置</li>
+</ul>
+<pre><code class="xml">&lt;beans&gt;
+    &lt;bean id=&quot;dataSource&quot; class=&quot;org.apache.commons.dbcp.BasicDataSource&quot; &gt;
+        &lt;property name=&quot;driverClassName&quot;&gt;
+            &lt;value&gt;com.mysql.jdbc.Driver&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;url&quot;&gt;
+            &lt;value&gt;url&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;username&quot;&gt;
+            &lt;value&gt;username&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;property name=&quot;password&quot;&gt;
+            &lt;value&gt;password&lt;/value&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;transactionManager&quot; class=&quot;org.springframework.jdbc.datasource.DataSourceTransactionManager&quot;&gt;
+        &lt;property name=&quot;dataSource&quot;&gt;
+            &lt;ref bean=&quot;dataSource&quot;&gt;&lt;/ref&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;jdbcTemplate&quot; class=&quot;org.springframework.jdbc.core.JdbcTemplate&quot;&gt;
+        &lt;property name=&quot;dataSource&quot;&gt;
+            &lt;ref bean=&quot;dataSource&quot;/&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;bean id=&quot;userServiceTarget&quot; class=&quot;org.springframework.transaction.UserServiceImpl&quot;&gt;
+        &lt;property name=&quot;jdbcTemplate&quot;&gt;
+            &lt;ref bean=&quot;jdbcTemplate&quot;&gt;&lt;/ref&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+
+    &lt;!--
+        TransactionProxyFactoryBean 实现了接口 InitializingBean，在初始化过程中会调用 afterPropertiesSet
+        1 : 创建事务拦截器
+        2 : 创建事务 advisor （事务的拦截切面）
+        3 : 创建代理
+    --&gt;
+    &lt;bean id=&quot;userService&quot; class=&quot;org.springframework.transaction.interceptor.TransactionProxyFactoryBean&quot;&gt;
+        &lt;property name=&quot;transactionManager&quot;&gt;
+            &lt;ref bean=&quot;transactionManager&quot; /&gt;
+        &lt;/property&gt;
+
+        &lt;property name=&quot;target&quot;&gt;
+            &lt;ref bean=&quot;userServiceTarget&quot;&gt;&lt;/ref&gt;
+        &lt;/property&gt;
+
+        &lt;property name=&quot;proxyInterfaces&quot;&gt;
+            &lt;value&gt;org.springframework.transaction.UserService&lt;/value&gt;
+        &lt;/property&gt;
+        &lt;!--
+            配置事务属性 传播行为, 事务隔离级别, 是否只读, 回滚规则（哪些异常下执行回滚），key 为配置需要事务管理的方法名；
+            在代理目标执行的时候会通过该属性判断方法是否需要事务管理
+        --&gt;
+        &lt;property name=&quot;transactionAttributes&quot;&gt;
+            &lt;props&gt;
+                &lt;prop key=&quot;*&quot;&gt;PROPAGATION_REQUIRED&lt;/prop&gt;
+            &lt;/props&gt;
+        &lt;/property&gt;
+    &lt;/bean&gt;
+&lt;/beans&gt;
+</code></pre>
+<p><code>transactionAttributes</code> 配置格式什么样的呢？配置值有哪些呢 ？</p>
+<ul>
+<li>接口实现</li>
+</ul>
+<pre><code class="java">public class UserServiceImpl implements UserService {
+
+    private JdbcTemplate jdbcTemplate;
+
+    public void create() {
+        System.out.println(jdbcTemplate.update(&quot;update fee_order set status = 1 where id = 22&quot;));
+    }
+
+    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public JdbcTemplate getJdbcTemplate() {
+        return jdbcTemplate;
+    }
+}
+</code></pre>
+<h3 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h3><h4 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h4><p><img src="https://user-gold-cdn.xitu.io/2019/3/7/16956a43d91cb942?w=532&amp;h=160&amp;f=png&amp;s=5861" alt="TransactionProxyFactoryBean"></p>
+<p>从 <code>TransactionProxyFactoryBean</code> 类结构我们知道，其实现了接口 <code>InitializingBean</code> 和 <code>FactoryBean</code>; 那么也就是在 <code>TransactionProxyFactoryBean</code> 实例化后会调用方法 <code>afterPropertiesSet</code>, 在获取目标对象实例时会调用方法 <code>getObject</code>; 下面将主要看下这两个方法的实现。</p>
+<h4 id="afterPropertiesSet-创建目标代理对象"><a href="#afterPropertiesSet-创建目标代理对象" class="headerlink" title="afterPropertiesSet-创建目标代理对象"></a>afterPropertiesSet-创建目标代理对象</h4><pre><code class="java">public void afterPropertiesSet() throws AopConfigException {
+    // 校验 Target 目标对象
+    if (this.target == null) {
+        throw new AopConfigException(&quot;Target must be set&quot;);
+    }
+
+    // 校验事务属性定义，从抛出的异常信息可以看出 Spring 在此做了强校验；
+    // 也就是说如果没有需要 Spring 事务管理的方法，就不要采用 TransactionProxyFactoryBean 了
+    // 那么 transactionAttributeSource 是怎么来的呢？ 见下文分析
+    if (this.transactionAttributeSource == null) {
+        throw new AopConfigException(&quot;Either &#39;transactionAttributeSource&#39; or &#39;transactionAttributes&#39; is required: &quot; +
+                                                                 &quot;If there are no transactional methods, don&#39;t use a transactional proxy.&quot;);
+    }
+
+    // 创建事务拦截器 transactionInterceptor
+    TransactionInterceptor transactionInterceptor = new TransactionInterceptor();
+    transactionInterceptor.setTransactionManager(this.transactionManager);
+    transactionInterceptor.setTransactionAttributeSource(this.transactionAttributeSource);
+    transactionInterceptor.afterPropertiesSet();
+
+    ProxyFactory proxyFactory = new ProxyFactory();
+
+    // 是否配置了前置拦截
+    if (this.preInterceptors != null) {
+        for (int i = 0; i &lt; this.preInterceptors.length; i++) {
+            proxyFactory.addAdvisor(GlobalAdvisorAdapterRegistry.getInstance().wrap(this.preInterceptors[i]));
+        }
+    }
+
+    if (this.pointcut != null) {
+        // 如果配置了 pointcut 切入点，则按配置的 pointcut 创建 advisor
+        Advisor advice = new DefaultPointcutAdvisor(this.pointcut, transactionInterceptor);
+        proxyFactory.addAdvisor(advice);
+    }
+    else {
+        // rely on default pointcut
+        // 创建事务拦截切面 advisor
+        proxyFactory.addAdvisor(new TransactionAttributeSourceAdvisor(transactionInterceptor));
+        // could just do the following, but it&#39;s usually less efficient because of AOP advice chain caching
+        // proxyFactory.addInterceptor(transactionInterceptor);
+    }
+
+    // 是否配置了后置拦截
+    if (this.postInterceptors != null) {
+        for (int i = 0; i &lt; this.postInterceptors.length; i++) {
+            proxyFactory.addAdvisor(GlobalAdvisorAdapterRegistry.getInstance().wrap(this.postInterceptors[i]));
+        }
+    }
+
+    proxyFactory.copyFrom(this);
+
+    proxyFactory.setTargetSource(createTargetSource(this.target));
+    // 设置代理的接口
+    if (this.proxyInterfaces != null) {
+        proxyFactory.setInterfaces(this.proxyInterfaces);
+    }
+    else if (!getProxyTargetClass()) {
+        // rely on AOP infrastructure to tell us what interfaces to proxy
+        proxyFactory.setInterfaces(AopUtils.getAllInterfaces(this.target));
+    }
+    // 创建目标对象的代理对象
+    this.proxy = proxyFactory.getProxy();
+}
+</code></pre>
+<p>从源码中我们知道 <code>afterPropertiesSet</code> 主要做以下几件事：</p>
+<ul>
+<li>参数有效性校验; 校验目标对象，事务属性定义</li>
+<li>设置代理的 advisor chain, 包括用户自定义的前置拦截, 内置的事务拦截器，用户自定义的后置拦截</li>
+<li>创建目标代理对象</li>
+</ul>
+<blockquote>
+<p>在 <code>afterPropertiesSet</code> 的实现中有个针对 <code>transactionAttributeSource</code> 的非空校验，那么这个变量是何时赋值的呢 ? 还记得使用示例中的关于事务属性的定义 <code>transactionAttributes</code> 吗 ?</p>
+</blockquote>
+<h4 id="setTransactionAttributes-设置事务属性定义"><a href="#setTransactionAttributes-设置事务属性定义" class="headerlink" title="setTransactionAttributes-设置事务属性定义"></a>setTransactionAttributes-设置事务属性定义</h4><pre><code class="java">public void setTransactionAttributes(Properties transactionAttributes) {
+    NameMatchTransactionAttributeSource tas = new NameMatchTransactionAttributeSource();
+    tas.setProperties(transactionAttributes);
+    this.transactionAttributeSource = tas;
+}
+
+public void setProperties(Properties transactionAttributes) {
+    TransactionAttributeEditor tae = new TransactionAttributeEditor();
+    // 遍历 properties
+    for (Iterator it = transactionAttributes.keySet().iterator(); it.hasNext(); ) {
+        // key 为匹配的方法名
+        String methodName = (String) it.next();
+        String value = transactionAttributes.getProperty(methodName);
+        // 解析 value
+        tae.setAsText(value);
+        TransactionAttribute attr = (TransactionAttribute) tae.getValue();
+        // 将方法名与事务属性定义匹配关联
+        addTransactionalMethod(methodName, attr);
+    }
+}
+</code></pre>
+<p>下面我们就看下 <code>setAsText</code> 方法是如何解析事务属性的配置</p>
+<pre><code class="java">/**
+ * Format is PROPAGATION_NAME,ISOLATION_NAME,readOnly,+Exception1,-Exception2.
+ * Null or the empty string means that the method is non transactional.
+ * @see java.beans.PropertyEditor#setAsText(java.lang.String)
+ */
+public void setAsText(String s) throws IllegalArgumentException {
+    if (s == null || &quot;&quot;.equals(s)) {
+        setValue(null);
+    }
+    else {
+        // tokenize it with &quot;,&quot;
+        // 按 , 分割配置信息
+        String[] tokens = StringUtils.commaDelimitedListToStringArray(s);
+        RuleBasedTransactionAttribute attr = new RuleBasedTransactionAttribute();
+
+        for (int i = 0; i &lt; tokens.length; i++) {
+            String token = tokens[i];
+            // 以 PROPAGATION 开头，则配置事务传播性
+            if (token.startsWith(TransactionDefinition.PROPAGATION_CONSTANT_PREFIX)) {
+                attr.setPropagationBehaviorName(tokens[i]);
+            }
+            // 以 ISOLATION 开头，则配置事务隔离级别
+            else if (token.startsWith(TransactionDefinition.ISOLATION_CONSTANT_PREFIX)) {
+                attr.setIsolationLevelName(tokens[i]);
+            }
+            // 以 timeout_ 开头，则设置事务超时时间
+            else if (token.startsWith(DefaultTransactionAttribute.TIMEOUT_PREFIX)) {
+                String value = token.substring(DefaultTransactionAttribute.TIMEOUT_PREFIX.length());
+                attr.setTimeout(Integer.parseInt(value));
+            }
+            // 若等于 readOnly 则配置事务只读
+            else if (token.equals(DefaultTransactionAttribute.READ_ONLY_MARKER)) {
+                attr.setReadOnly(true);
+            }
+            // 以 + 开头，则配置哪些异常下不回滚
+            else if (token.startsWith(DefaultTransactionAttribute.COMMIT_RULE_PREFIX)) {
+                attr.getRollbackRules().add(new NoRollbackRuleAttribute(token.substring(1)));
+            }
+            // 以 - 开头，则配置哪些异常下回滚
+            else if (token.startsWith(DefaultTransactionAttribute.ROLLBACK_RULE_PREFIX)) {
+                attr.getRollbackRules().add(new RollbackRuleAttribute(token.substring(1)));
+            }
+            else {
+                throw new IllegalArgumentException(&quot;Illegal transaction token: &quot; + token);
+            }
+        }
+
+        setValue(attr);
+    }
+}
+</code></pre>
+<p>从 <code>setAsText</code> 方法的实现我们就可以搞明白在配置文件中 <code>transactionAttributes</code> 如何配置了，譬如：</p>
+<pre><code class="xml">&lt;property name=&quot;transactionAttributes&quot;&gt;
+    &lt;props&gt;
+        &lt;prop key=&quot;*&quot;&gt;PROPAGATION_REQUIRED, ISOLATION_DEFAULT, readOnly&lt;/prop&gt;
+    &lt;/props&gt;
+&lt;/property&gt;
+</code></pre>
+<p>也可以这样配置：</p>
+<pre><code class="xml">&lt;property name=&quot;transactionAttributes&quot;&gt;
+    &lt;props&gt;
+        &lt;prop key=&quot;*&quot;&gt;readOnly, ISOLATION_DEFAULT, PROPAGATION_REQUIRED&lt;/prop&gt;
+    &lt;/props&gt;
+&lt;/property&gt;
+</code></pre>
+<p>也就是说 <code>transactionAttributes</code> 的配置只要保证 <code>token</code> 格式正确即可，顺序无关；但是从规范来讲建议还是保持 <code>PROPAGATION_NAME,ISOLATION_NAME,readOnly,+Exception1,-Exception2.</code> 的格式。</p>
+<h4 id="getObject-获取代理对象"><a href="#getObject-获取代理对象" class="headerlink" title="getObject-获取代理对象"></a>getObject-获取代理对象</h4><pre><code class="java">public Object getObject() {
+    // proxy 对象在 afterPropertiesSet 方法执行时产生
+    return this.proxy;
+}
+</code></pre>
+<h4 id="代理执行"><a href="#代理执行" class="headerlink" title="代理执行"></a>代理执行</h4><h5 id="是否支持事务"><a href="#是否支持事务" class="headerlink" title="是否支持事务"></a>是否支持事务</h5><p>在 <code>重拾-Spring AOP</code> 中我们知道，当代理对象在执行的时候会先获取当前方法所匹配的 <code>advisor</code> (参见类 <code>JdkDynamicAopProxy</code>); 而 <code>TransactionProxyFactoryBean</code> 在创建代理对象的时候会将 <code>TransactionInterceptor</code> 绑定到 <code>TransactionAttributeSourceAdvisor</code> 上，那么我就看下 <code>TransactionAttributeSourceAdvisor</code> 是如何匹配方法的。</p>
+<pre><code class="java">public class TransactionAttributeSourceAdvisor extends StaticMethodMatcherPointcutAdvisor {
+
+    private TransactionAttributeSource transactionAttributeSource;
+
+    public TransactionAttributeSourceAdvisor(TransactionInterceptor ti) {
+        super(ti);
+        if (ti.getTransactionAttributeSource() == null) {
+            throw new AopConfigException(&quot;Cannot construct a TransactionAttributeSourceAdvisor using a &quot; +
+                                                                     &quot;TransactionInterceptor that has no TransactionAttributeSource configured&quot;);
+        }
+        this.transactionAttributeSource = ti.getTransactionAttributeSource();
+    }
+
+    public boolean matches(Method m, Class targetClass) {
+        return (this.transactionAttributeSource.getTransactionAttribute(m, targetClass) != null);
+    }
+}
+</code></pre>
+<p><code>TransactionAttributeSourceAdvisor</code> 判断方法是否匹配时，实际是由 <code>NameMatchTransactionAttributeSource</code> 的方法 <code>getTransactionAttribute</code> 来处理。</p>
+<pre><code class="java">public TransactionAttribute getTransactionAttribute(Method method, Class targetClass) {
+    // 获取目标方法名
+    String methodName = method.getName();
+    // 获取目标方法匹配的事务属性定义
+    TransactionAttribute attr = (TransactionAttribute) this.nameMap.get(methodName);
+    // 如果 attr 不为空说明当前方法配置了事务属性定义，也就是当前方法需要事务管理
+    if (attr != null) {
+        return attr;
+    }
+    else {
+        // look up most specific name match
+        String bestNameMatch = null;
+        for (Iterator it = this.nameMap.keySet().iterator(); it.hasNext();) {
+            // 判断当前方法是否匹配通配符的方式
+            String mappedName = (String) it.next();
+            if (isMatch(methodName, mappedName) &amp;&amp;
+                    (bestNameMatch == null || bestNameMatch.length() &lt;= mappedName.length())) {
+                attr = (TransactionAttribute) this.nameMap.get(mappedName);
+                bestNameMatch = mappedName;
+            }
+        }
+        return attr;
+    }
+}
+
+protected boolean isMatch(String methodName, String mappedName) {
+    return (mappedName.endsWith(&quot;*&quot;) &amp;&amp; methodName.startsWith(mappedName.substring(0, mappedName.length() - 1))) ||
+            (mappedName.startsWith(&quot;*&quot;) &amp;&amp; methodName.endsWith(mappedName.substring(1, mappedName.length())));
+}
+</code></pre>
+<h5 id="TransactionInterceptor-事务拦截"><a href="#TransactionInterceptor-事务拦截" class="headerlink" title="TransactionInterceptor-事务拦截"></a>TransactionInterceptor-事务拦截</h5><p>在完成判断当前方法是否需要事务管理后，如果需要事务管理最终会调用 <code>TransactionInterceptor</code> 执行事务拦截的处理。</p>
+<pre><code class="java">public final Object invoke(MethodInvocation invocation) throws Throwable {
+    Class targetClass = (invocation.getThis() != null) ? invocation.getThis().getClass() : null;
+    // if the transaction attribute is null, the method is non-transactional
+    // 获取当前方法所支持的事务配置属性，若不存在则说明当前方法不需要事务管理
+    TransactionAttribute transAtt = this.transactionAttributeSource.getTransactionAttribute(invocation.getMethod(), targetClass);
+    TransactionStatus status = null;
+    TransactionStatus oldTransactionStatus = null;
+
+    // create transaction if necessary
+    if (transAtt != null) {        
+        // the transaction manager will flag an error if an incompatible tx already exists
+        // 通过事务管理获取事务，该事务可能是新创建的也可能是当前上下文已存在的事务
+        // 返回事务状态
+        status = this.transactionManager.getTransaction(transAtt);
+
+        // make the TransactionStatus available to callees
+        oldTransactionStatus = (TransactionStatus) currentTransactionStatus.get();
+        currentTransactionStatus.set(status);
+    }
+    else {
+        // it isn&#39;t a transactional method
+
+    }
+
+    Object retVal = null;
+    try {
+        // 目标方法执行
+        retVal = invocation.proceed();
+    }
+    catch (Throwable ex) {
+        // target invocation exception
+        if (status != null) {
+            // 异常处理 可能会执行事务的回滚
+            onThrowable(invocation, transAtt, status, ex);
+        }
+        throw ex;
+    }
+    finally {
+        if (transAtt != null) {
+            // use stack to restore old transaction status if one was set
+            currentTransactionStatus.set(oldTransactionStatus);
+        }
+    }
+    if (status != null) {
+        // 通过事务管理执行事务提交
+        this.transactionManager.commit(status);
+    }
+    return retVal;
+}
+</code></pre>
+<pre><code class="java">private void onThrowable(MethodInvocation invocation, TransactionAttribute txAtt,
+                             TransactionStatus status, Throwable ex) {
+    // 判断异常是否需要回滚
+    if (txAtt.rollbackOn(ex)) {
+        try {
+            // 通过事务管理执行回滚
+            this.transactionManager.rollback(status);
+        }
+        catch (TransactionException tex) {
+            logger.error(&quot;Application exception overridden by rollback exception&quot;, ex);
+            throw tex;
+        }
+    }
+    else {
+        // Will still roll back if rollbackOnly is true
+        // 异常不需要回滚的话 则提交事务
+        this.transactionManager.commit(status);
+    }
+}
+</code></pre>
+<p>从 <code>TransactionInterceptor</code> 的处理逻辑来看，我们知道其主要做以下事情：</p>
+<ul>
+<li>获取当前方法所定义的事务属性</li>
+<li>通过事务管理器 Transaction Manager 来获取事务</li>
+<li>目标方法执行</li>
+<li>执行异常处理，如异常需要回滚则通过事务管理器执行事务 <code>rollback</code>，反之执行事务 <code>commit</code></li>
+<li>方法执行成功则执行事务 <code>commit</code></li>
+</ul>
+<blockquote>
+<p>也就是说 <code>TransactionInterceptor</code> (事务拦截器) 主要是将事务相关的动作委托给 <code>TransactionManager</code> （事务管理器）处理</p>
+</blockquote>
+<h5 id="TransactionManager-事务管理"><a href="#TransactionManager-事务管理" class="headerlink" title="TransactionManager-事务管理"></a>TransactionManager-事务管理</h5><blockquote>
+<p>本文是以 <code>DataSourceTransactionManager</code> 为例来分析事务的管理实现</p>
+</blockquote>
+<h6 id="getTransaction-获取事务"><a href="#getTransaction-获取事务" class="headerlink" title="getTransaction-获取事务"></a>getTransaction-获取事务</h6><pre><code class="java">public final TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException {
+    // 获取事务
+    Object transaction = doGetTransaction();
+    if (definition == null) {
+        // 若 definition == null 则采用默认的事务定义
+        definition = new DefaultTransactionDefinition();
+    }
+
+    // 判断当前上下文是否开启过事务
+    if (isExistingTransaction(transaction)) {
+        // 当前上下文开启过事务
+        // 如果当前方法匹配的事务传播性为 PROPAGATION_NEVER 说明不需要事务则抛出异常
+        if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NEVER) {
+            throw new IllegalTransactionStateException(&quot;Transaction propagation &#39;never&#39; but existing transaction found&quot;);
+        }
+
+        // 如果当前方法匹配的事务传播性为 PROPAGATION_NOT_SUPPORTED 说明该方法不应该运行在事务中，则将当前事务挂起
+        if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
+            // 将当前事务挂起
+            Object suspendedResources = suspend(transaction);
+            boolean newSynchronization = (this.transactionSynchronization == SYNCHRONIZATION_ALWAYS);
+            // 返回的事务状态为 不需要事务
+            return newTransactionStatus(null, false, newSynchronization,
+                                        definition.isReadOnly(), debugEnabled, suspendedResources);
+        }
+        // 如果当前方法匹配的事务传播性为 PROPAGATION_REQUIRES_NEW 表示当前方法必须运行在它自己的事务中；将已存在的事务挂起，重新开启事务
+        if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
+            if (debugEnabled) {
+                logger.debug(&quot;Creating new transaction, suspending current one&quot;);
+            }
+            // 挂起当前事务
+            Object suspendedResources = suspend(transaction);
+            // 重新开启个事务
+            doBegin(transaction, definition);
+            boolean newSynchronization = (this.transactionSynchronization != SYNCHRONIZATION_NEVER);
+            // 返回的事务状态为 新建事务
+            return newTransactionStatus(transaction, true, newSynchronization,
+                                        definition.isReadOnly(), debugEnabled, suspendedResources);
+        }
+        else {
+            boolean newSynchronization = (this.transactionSynchronization != SYNCHRONIZATION_NEVER);
+            // 其他的传播行为 表示在已存在的事务中执行
+            return newTransactionStatus(transaction, false, newSynchronization,
+                                        definition.isReadOnly(), debugEnabled, null);
+        }
+    }
+
+    if (definition.getTimeout() &lt; TransactionDefinition.TIMEOUT_DEFAULT) {
+        throw new InvalidTimeoutException(&quot;Invalid transaction timeout&quot;, definition.getTimeout());
+    }
+
+    // 如果传播性为 PROPAGATION_MANDATORY 说明必须在事务中执行，若当前没有事务的话则抛出异常
+    if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_MANDATORY) {
+        throw new IllegalTransactionStateException(&quot;Transaction propagation &#39;mandatory&#39; but no existing transaction found&quot;);
+    }
+
+    // 当前上下文不存在事务
+    // 若传播性为 PROPAGATION_REQUIRED 或 PROPAGATION_REQUIRES_NEW 则开启新的事务执行
+    if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRED ||
+        definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW) {
+        // 开启新的 connection 并取消自动提交，将 connection 绑定当前线程
+        doBegin(transaction, definition);
+        boolean newSynchronization = (this.transactionSynchronization != SYNCHRONIZATION_NEVER);
+        return newTransactionStatus(transaction, true, newSynchronization,
+                                    definition.isReadOnly(), debugEnabled, null);
+    }
+    else {
+        // &quot;empty&quot; (-&gt; no) transaction
+        boolean newSynchronization = (this.transactionSynchronization == SYNCHRONIZATION_ALWAYS);
+        // 返回事务状态为 不需要事务
+        return newTransactionStatus(null, false, newSynchronization,
+                                    definition.isReadOnly(), debugEnabled, null);
+    }
+}
+
+protected Object doGetTransaction() {
+    // 判断当前线程是否开启过事务
+    if (TransactionSynchronizationManager.hasResource(this.dataSource)) {
+        // 获取当前已存在的 connectoin holder
+        ConnectionHolder holder = (ConnectionHolder) TransactionSynchronizationManager.getResource(this.dataSource);
+        return new DataSourceTransactionObject(holder);
+    }
+    else {
+        return new DataSourceTransactionObject();
+    }
+}
+</code></pre>
+<p>看到了这里，是不是突然明白 <code>PROPAGATION</code> (事务传播性) 是干什么的了；</p>
+<blockquote>
+<p>简单来说, <code>PROPAGATION</code> 就是为了告诉 Spring 当前方法需不需要事务，是在已存在的事务中执行，还是新开启事务执行；也可以认为是继承上个方法栈的事务，还是拥有自己的事务。</p>
+</blockquote>
+<p><code>TransactionManager</code> 获取事务的过程实际就是通过当前方法定义的 <code>PROPAGATION</code> (事务传播性) 和当前上下文是否存在事务来判断是否需要事务，是否需要开启新的事务或者是使用当前已存在的事务。</p>
+<p>下面看下如何开启新的事务 <code>doBegin</code></p>
+<pre><code class="java">protected void doBegin(Object transaction, TransactionDefinition definition) {
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+
+    // cache to avoid repeated checks
+    boolean debugEnabled = logger.isDebugEnabled();
+
+    // 判断 connection holder 是否为空
+    // 两种场景下可能为空：
+    // 1. 上下文不存在事务的时候
+    // 2. 上下文已存在的事务被挂起的时候
+    if (txObject.getConnectionHolder() == null) {
+        if (debugEnabled) {
+            logger.debug(&quot;Opening new connection for JDBC transaction&quot;);
+        }
+        // 开启新的 connection
+        Connection con = DataSourceUtils.getConnection(this.dataSource, false);
+        txObject.setConnectionHolder(new ConnectionHolder(con));
+    }
+
+    Connection con = txObject.getConnectionHolder().getConnection();
+    try {
+        // apply read-only
+        if (definition.isReadOnly()) {
+            try {
+                // 如果定义了只读，设置 connection 为只读
+                con.setReadOnly(true);
+            }
+            catch (Exception ex) {
+                // SQLException or UnsupportedOperationException
+                logger.warn(&quot;Could not set JDBC connection read-only&quot;, ex);
+            }
+        }
+
+        // apply isolation level
+        // 设置事务隔离级别
+        if (definition.getIsolationLevel() != TransactionDefinition.ISOLATION_DEFAULT) {
+            txObject.setPreviousIsolationLevel(new Integer(con.getTransactionIsolation()));
+            con.setTransactionIsolation(definition.getIsolationLevel());
+        }
+
+        // 若 connection 为自动提交则取消
+        if (con.getAutoCommit()) {
+            txObject.setMustRestoreAutoCommit(true);
+            con.setAutoCommit(false);
+        }
+
+        // 设置超时时间
+        if (definition.getTimeout() != TransactionDefinition.TIMEOUT_DEFAULT) {
+            txObject.getConnectionHolder().setTimeoutInSeconds(definition.getTimeout());
+        }
+
+        // 将当前 connection holder 绑定到当前上下文
+        TransactionSynchronizationManager.bindResource(this.dataSource, txObject.getConnectionHolder());
+    }
+    catch (SQLException ex) {
+        throw new CannotCreateTransactionException(&quot;Could not configure connection&quot;, ex);
+    }
+}
+</code></pre>
+<p><code>doBegin</code> 执行开启事务的操作，在上下文不存在事务或者上下文事务被挂起的时候会新打开一个 <code>connection</code>, 并按照事务定义设置相关属性，譬如是否只读，取消自动提交，设置事务隔离级别，设置超时时间；最后会将 <code>connection</code> 绑定到当前上下文，也即当前线程。</p>
+<h6 id="doSuspend-事务挂起"><a href="#doSuspend-事务挂起" class="headerlink" title="doSuspend-事务挂起"></a>doSuspend-事务挂起</h6><pre><code class="java">protected Object doSuspend(Object transaction) {
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) transaction;
+    // 将当前事务的 connection holder 置为空
+    txObject.setConnectionHolder(null);
+    // 并将当前事务与上下文解绑
+    return TransactionSynchronizationManager.unbindResource(this.dataSource);
+}
+</code></pre>
+<p>事务挂起既是将当前事务的连接持有者清空并与当前上下文解绑，保证后续能够重新开启事务。</p>
+<h6 id="数据库操作"><a href="#数据库操作" class="headerlink" title="数据库操作"></a>数据库操作</h6><blockquote>
+<p>针对数据库的操作，本文以 Spring 提供的 <code>jdbcTemplate</code> 工具类进行分析。</p>
+</blockquote>
+<pre><code class="java">public Object execute(final StatementCallback action) {
+    // 若当前需要事务管理的话，那么此时获取的 connection 则是 transaction manager bind 的 connection
+    // 这样就保证数据库操作的时候所获得的的 connection 与 事务管理的一致
+    Connection con = DataSourceUtils.getConnection(getDataSource());
+    Statement stmt = null;
+    // 以下代码省略 此处重点关注如何获取 connection
+}
+</code></pre>
+<pre><code class="java">public static Connection getConnection(DataSource ds, boolean allowSynchronization)
+        throws CannotGetJdbcConnectionException {
+    // 从当前上下文获取 connection holder
+    ConnectionHolder conHolder = (ConnectionHolder) TransactionSynchronizationManager.getResource(ds);
+    if (conHolder != null) {
+        return conHolder.getConnection();
+    }
+    else {
+        try {
+            // 反之新打开一个 connection
+            Connection con = ds.getConnection();
+            if (allowSynchronization &amp;&amp; TransactionSynchronizationManager.isSynchronizationActive()) {
+                logger.debug(&quot;Registering transaction synchronization for JDBC connection&quot;);
+                // use same Connection for further JDBC actions within the transaction
+                // thread object will get removed by synchronization at transaction completion
+                conHolder = new ConnectionHolder(con);
+                TransactionSynchronizationManager.bindResource(ds, conHolder);
+                TransactionSynchronizationManager.registerSynchronization(new ConnectionSynchronization(conHolder, ds));
+            }
+            return con;
+        }
+        catch (SQLException ex) {
+            throw new CannotGetJdbcConnectionException(&quot;Could not get JDBC connection&quot;, ex);
+        }
+    }
+}
+</code></pre>
+<h6 id="commit-事务提交"><a href="#commit-事务提交" class="headerlink" title="commit-事务提交"></a>commit-事务提交</h6><pre><code class="java">public final void commit(TransactionStatus status) throws TransactionException {
+    DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
+    // 省略
+    else {
+        try {
+            try {
+                triggerBeforeCommit(defStatus);
+                triggerBeforeCompletion(defStatus);
+                if (status.isNewTransaction()) {
+                    logger.info(&quot;Initiating transaction commit&quot;);
+                    // 执行事务提交
+                    doCommit(defStatus);
+                }
+            }
+            // 省略
+        }
+        finally {
+            cleanupAfterCompletion(defStatus);
+        }
+    }
+}
+</code></pre>
+<p><code>doCommit</code> 执行事务提交</p>
+<pre><code class="java">protected void doCommit(DefaultTransactionStatus status) {
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) status.getTransaction();
+    if (status.isDebug()) {
+        logger.debug(&quot;Committing JDBC transaction [&quot; + txObject.getConnectionHolder().getConnection() + &quot;]&quot;);
+    }
+    try {
+        // 事务提交
+        txObject.getConnectionHolder().getConnection().commit();
+    }
+    catch (SQLException ex) {
+        throw new TransactionSystemException(&quot;Could not commit&quot;, ex);
+    }
+}
+</code></pre>
+<h6 id="resume-事务恢复"><a href="#resume-事务恢复" class="headerlink" title="resume-事务恢复"></a>resume-事务恢复</h6><p>从上文的 <code>commit</code> 事务提交操作发现，在完成事务提交之后，还有个后置动作 <code>cleanupAfterCompletion</code>, 该方法会对挂起中的事务执行恢复操作。</p>
+<pre><code class="java">private void cleanupAfterCompletion(DefaultTransactionStatus status) {
+    if (status.isNewSynchronization()) {
+        TransactionSynchronizationManager.clearSynchronization();
+    }
+    if (status.isNewTransaction()) {
+        doCleanupAfterCompletion(status.getTransaction());
+    }
+    // 当存在挂起的事务时，执行恢复挂起的事务
+    if (status.getSuspendedResources() != null) {
+        if (status.isDebug()) {
+            logger.debug(&quot;Resuming suspended transaction&quot;);
+        }
+        resume(status.getTransaction(), status.getSuspendedResources());
+    }
+}
+</code></pre>
+<pre><code class="java">protected void doResume(Object transaction, Object suspendedResources) {
+    // 将挂起的事务绑定的 connection 重新绑定到当前上下文
+    ConnectionHolder conHolder = (ConnectionHolder) suspendedResources;
+    TransactionSynchronizationManager.bindResource(this.dataSource, conHolder);
+}
+</code></pre>
+<h6 id="rollback-事务回滚"><a href="#rollback-事务回滚" class="headerlink" title="rollback-事务回滚"></a>rollback-事务回滚</h6><pre><code class="java">public final void rollback(TransactionStatus status) throws TransactionException {
+    DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
+    try {
+        try {
+            triggerBeforeCompletion(defStatus);
+            if (status.isNewTransaction()) {
+                // 执行事务回滚
+                logger.info(&quot;Initiating transaction rollback&quot;);
+                doRollback(defStatus);
+            }
+            else if (defStatus.getTransaction() != null) {
+                if (defStatus.isDebug()) {
+                    logger.debug(&quot;Setting existing transaction rollback-only&quot;);
+                }
+                doSetRollbackOnly(defStatus);
+            }
+            else {
+                logger.info(&quot;Should roll back transaction but cannot - no transaction available&quot;);
+            }
+        }
+        catch (TransactionException ex) {
+            triggerAfterCompletion(defStatus, TransactionSynchronization.STATUS_UNKNOWN, ex);
+            throw ex;
+        }
+        triggerAfterCompletion(defStatus, TransactionSynchronization.STATUS_ROLLED_BACK, null);
+    }
+    finally {
+        cleanupAfterCompletion(defStatus);
+    }
+}
+</code></pre>
+<h2 id="从源码中熟悉事务相关定义"><a href="#从源码中熟悉事务相关定义" class="headerlink" title="从源码中熟悉事务相关定义"></a>从源码中熟悉事务相关定义</h2><h3 id="事务属性定义"><a href="#事务属性定义" class="headerlink" title="事务属性定义"></a>事务属性定义</h3><h4 id="事务传播性"><a href="#事务传播性" class="headerlink" title="事务传播性"></a>事务传播性</h4><h4 id="事务隔离型"><a href="#事务隔离型" class="headerlink" title="事务隔离型"></a>事务隔离型</h4><h4 id="事务只读"><a href="#事务只读" class="headerlink" title="事务只读"></a>事务只读</h4><h4 id="事务回滚规则"><a href="#事务回滚规则" class="headerlink" title="事务回滚规则"></a>事务回滚规则</h4><h3 id="事务状态"><a href="#事务状态" class="headerlink" title="事务状态"></a>事务状态</h3><h3 id="事务拦截器"><a href="#事务拦截器" class="headerlink" title="事务拦截器"></a>事务拦截器</h3><h3 id="事务管理"><a href="#事务管理" class="headerlink" title="事务管理"></a>事务管理</h3><h2 id="其他事务配置方式"><a href="#其他事务配置方式" class="headerlink" title="其他事务配置方式"></a>其他事务配置方式</h2><h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2>
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;Spring</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>
