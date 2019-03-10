@@ -99,11 +99,13 @@
       <div class="container">
         <div class="section">
           <div class="post_content">
-              <h2 id="疑惑"><a href="#疑惑" class="headerlink" title="疑惑"></a>疑惑</h2><p>面试中是不是有时经常会被问到 “Spring 事务如何管理的了解吗？” “Spring 事务的传播性有哪些，都是怎么用的呢？”</p>
-<h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><h3 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h3><ul>
-<li>Spring 配置</li>
-</ul>
+              <h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><p>面试中是不是有时经常会被问到 “Spring 事务如何管理的了解吗？” ，“Spring 事务的传播性有哪些，能聊聊它们的使用场景吗？”， “事务回滚的时候是所有异常下都会回滚吗？”； 下面我们就带着这些问题来看看 Spring 事务是如何实现的吧。</p>
+<h2 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h2><p>首先我们还是先通过一个使用示例，先看下 Spring 事务是如何工作的。</p>
+<h3 id="使用示例"><a href="#使用示例" class="headerlink" title="使用示例"></a>使用示例</h3><blockquote>
+<p>本文我们先采用 <code>TransactionProxyFactoryBean</code> 配置的方式来看下， Spring 事务如何实现</p>
+</blockquote>
 <pre><code class="xml">&lt;beans&gt;
+    &lt;!-- 配置数据源 --&gt;
     &lt;bean id=&quot;dataSource&quot; class=&quot;org.apache.commons.dbcp.BasicDataSource&quot; &gt;
         &lt;property name=&quot;driverClassName&quot;&gt;
             &lt;value&gt;com.mysql.jdbc.Driver&lt;/value&gt;
@@ -119,12 +121,14 @@
         &lt;/property&gt;
     &lt;/bean&gt;
 
+    &lt;!-- 配置事务管理 --&gt;
     &lt;bean id=&quot;transactionManager&quot; class=&quot;org.springframework.jdbc.datasource.DataSourceTransactionManager&quot;&gt;
         &lt;property name=&quot;dataSource&quot;&gt;
             &lt;ref bean=&quot;dataSource&quot;&gt;&lt;/ref&gt;
         &lt;/property&gt;
     &lt;/bean&gt;
 
+    &lt;!-- 配置 jdbcTemplate --&gt;
     &lt;bean id=&quot;jdbcTemplate&quot; class=&quot;org.springframework.jdbc.core.JdbcTemplate&quot;&gt;
         &lt;property name=&quot;dataSource&quot;&gt;
             &lt;ref bean=&quot;dataSource&quot;/&gt;
@@ -167,27 +171,7 @@
     &lt;/bean&gt;
 &lt;/beans&gt;
 </code></pre>
-<p><code>transactionAttributes</code> 配置格式什么样的呢？配置值有哪些呢 ？</p>
-<ul>
-<li>接口实现</li>
-</ul>
-<pre><code class="java">public class UserServiceImpl implements UserService {
-
-    private JdbcTemplate jdbcTemplate;
-
-    public void create() {
-        System.out.println(jdbcTemplate.update(&quot;update fee_order set status = 1 where id = 22&quot;));
-    }
-
-    public void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
-    }
-
-    public JdbcTemplate getJdbcTemplate() {
-        return jdbcTemplate;
-    }
-}
-</code></pre>
+<p>在 <code>TransactionProxyFactoryBean</code> 的属性配置中如果您对 <code>transactionAttributes</code> 属性不熟悉的话，是不是会感觉一头雾水呢？ 这个玩意怎么配置的？ 配置格式又是什么样的呢？ 配置值有哪些呢 ？； 下面将会通过对 <code>TransactionProxyFactoryBean</code> 的源码分析来一一解答。</p>
 <h3 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h3><h4 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h4><p><img src="https://user-gold-cdn.xitu.io/2019/3/7/16956a43d91cb942?w=532&amp;h=160&amp;f=png&amp;s=5861" alt="TransactionProxyFactoryBean"></p>
 <p>从 <code>TransactionProxyFactoryBean</code> 类结构我们知道，其实现了接口 <code>InitializingBean</code> 和 <code>FactoryBean</code>; 那么也就是在 <code>TransactionProxyFactoryBean</code> 实例化后会调用方法 <code>afterPropertiesSet</code>, 在获取目标对象实例时会调用方法 <code>getObject</code>; 下面将主要看下这两个方法的实现。</p>
 <h4 id="afterPropertiesSet-创建目标代理对象"><a href="#afterPropertiesSet-创建目标代理对象" class="headerlink" title="afterPropertiesSet-创建目标代理对象"></a>afterPropertiesSet-创建目标代理对象</h4><pre><code class="java">public void afterPropertiesSet() throws AopConfigException {
@@ -691,6 +675,7 @@ protected Object doGetTransaction() {
     }
 }
 </code></pre>
+<p>从上述代码我们可以看到，当通过 <code>jdbcTemplate</code> 操作数据库时会先从当前上下文中获取 <code>connection</code>; 这样就保证了所获取的事务与事务拦截器的事务为同一个实例，也就是将事务交给了 Spring 来管理。</p>
 <h6 id="commit-事务提交"><a href="#commit-事务提交" class="headerlink" title="commit-事务提交"></a>commit-事务提交</h6><pre><code class="java">public final void commit(TransactionStatus status) throws TransactionException {
     DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
     // 省略
@@ -751,7 +736,27 @@ protected Object doGetTransaction() {
     TransactionSynchronizationManager.bindResource(this.dataSource, conHolder);
 }
 </code></pre>
-<h6 id="rollback-事务回滚"><a href="#rollback-事务回滚" class="headerlink" title="rollback-事务回滚"></a>rollback-事务回滚</h6><pre><code class="java">public final void rollback(TransactionStatus status) throws TransactionException {
+<p>事务的 <code>resume</code> 就是将挂起的事务重新绑定到当前上下文中。 </p>
+<h6 id="rollback-事务回滚"><a href="#rollback-事务回滚" class="headerlink" title="rollback-事务回滚"></a>rollback-事务回滚</h6><p>当 <code>TransactionInterceptor</code> 调用目标方法执行出现异常的时候，会进行异常处理执行方法 <code>onThrowable</code></p>
+<pre><code class="java">private void onThrowable(MethodInvocation invocation, TransactionAttribute txAtt,
+                         TransactionStatus status, Throwable ex) {
+    if (txAtt.rollbackOn(ex)) {
+        try {
+            // 异常需要回滚
+            this.transactionManager.rollback(status);
+        }
+        catch (TransactionException tex) {
+            throw tex;
+        }
+    }
+    else {
+        // 异常不需要回滚的话 则提交事务
+        this.transactionManager.commit(status);
+    }
+}
+</code></pre>
+<p><code>onThrowable</code> 方法会通过配置判断当前异常是否需要回滚。</p>
+<pre><code class="java">public final void rollback(TransactionStatus status) throws TransactionException {
     DefaultTransactionStatus defStatus = (DefaultTransactionStatus) status;
     try {
         try {
@@ -781,8 +786,31 @@ protected Object doGetTransaction() {
         cleanupAfterCompletion(defStatus);
     }
 }
+
+protected void doRollback(DefaultTransactionStatus status) {
+    DataSourceTransactionObject txObject = (DataSourceTransactionObject) status.getTransaction();
+    try {
+        // 执行回滚
+        txObject.getConnectionHolder().getConnection().rollback();
+    }
+    catch (SQLException ex) {
+        throw new TransactionSystemException(&quot;Could not rollback&quot;, ex);
+    }
+}
 </code></pre>
-<h2 id="从源码中熟悉事务相关定义"><a href="#从源码中熟悉事务相关定义" class="headerlink" title="从源码中熟悉事务相关定义"></a>从源码中熟悉事务相关定义</h2><h3 id="事务属性定义"><a href="#事务属性定义" class="headerlink" title="事务属性定义"></a>事务属性定义</h3><h4 id="事务传播性"><a href="#事务传播性" class="headerlink" title="事务传播性"></a>事务传播性</h4><h4 id="事务隔离型"><a href="#事务隔离型" class="headerlink" title="事务隔离型"></a>事务隔离型</h4><h4 id="事务只读"><a href="#事务只读" class="headerlink" title="事务只读"></a>事务只读</h4><h4 id="事务回滚规则"><a href="#事务回滚规则" class="headerlink" title="事务回滚规则"></a>事务回滚规则</h4><h3 id="事务状态"><a href="#事务状态" class="headerlink" title="事务状态"></a>事务状态</h3><h3 id="事务拦截器"><a href="#事务拦截器" class="headerlink" title="事务拦截器"></a>事务拦截器</h3><h3 id="事务管理"><a href="#事务管理" class="headerlink" title="事务管理"></a>事务管理</h3><h2 id="其他事务配置方式"><a href="#其他事务配置方式" class="headerlink" title="其他事务配置方式"></a>其他事务配置方式</h2><h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>此时我们基本明白了 Spring Transaction 的实现原理，下面对其实现做个小结：</p>
+<ul>
+<li>Spring Transaction 是基于 Spring AOP 的一种实现</li>
+<li>Spring Transaction 通过配置创建事务 advisor 并创建目标对象代理类</li>
+<li>目标方法执行时将会被 <code>TransactionInterceptor</code> 拦截</li>
+<li><code>TransactionInterceptor</code> 会委派 <code>TransactionManager</code> 执行事务的创建，事务提交，事务回滚的动作</li>
+<li><code>TransactionManager</code> 会根据当前方法配置的事务传播性及当前上下文是否存在事务来判断是否新建事务</li>
+<li><code>TransactionManager</code> 当新建事务时会将事务绑定到当前上下文，以保证目标方法执行时获取的事务为同一实例</li>
+<li><code>TransactionManager</code> 执行事务挂起时会将当前事务与当前上下文解除绑定关系</li>
+<li><code>TransactionManager</code> 执行事务恢复时会将已挂起的事务重新与当前上下文绑定</li>
+</ul>
+<p><img src="https://user-gold-cdn.xitu.io/2019/3/10/1696575e80cac8ff?w=2322&amp;h=1603&amp;f=png&amp;s=308825" alt="Spring Transaction"></p>
+
           </div>
           <br><br>
           <div>
