@@ -97,6 +97,58 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/01/20/Netty客户端链接派发分析/" class="h3 title" target="_self">Netty客户端链接派发分析</a>
+                    
+                    <p>在上篇针对 Netty 的服务端启动过程进行了分析，我们知道服务端包含了两个 NioEventLoopGroup, 一个是 boss 用于接收客户端的请求，一个是 worker 用于处理客户端的读写操作；那么 boss group 是如何将客户端链接通道派发到 worker 呢？本文主要针对这个问题进行分析。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-20
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    netty &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/01/17/Netty服务端启动源码分析/" class="h3 title" target="_self">Netty服务端启动源码分析</a>
+                    
+                    <p>  Netty 是一个高性能异步事件驱动的 NIO 框架, 因其底层采用的 NIO, 故其启动过程一样可以分为以下几个步骤:
+
+selector 多路复用选择器开启
+ServerSocketChannel 通道建立并绑定端口
+ServerSocketChannel 通道注册到 selector 并监听 accept 事件
+
+在进行服务端启动分析前，我们先看下 netty 的服务端使用示例。...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-17
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    netty &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2017/12/22/zookeeper源码阅读之watch/" class="h3 title" target="_self">zookeeper源码阅读之watch</a>
                     
                     <p>watcher 流程概述watcher 用来客户端监听某一节点的特性变化，执行对应的操作. 从下图可以看出 watcher 的流程主要包括:

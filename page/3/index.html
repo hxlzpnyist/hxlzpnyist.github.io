@@ -96,6 +96,59 @@
         <div class="row post-card">
             
             
+                <div class="col-md-11">
+                    <a href="/2018/12/02/AbstractQueuedSynchronizer-队列同步器源码分析/" class="h3 title" target="_self">AbstractQueuedSynchronizer 队列同步器源码分析</a>
+                    
+                    <p>AbstractQueuedSynchronizer 队列同步器（AQS）
+队列同步器 (AQS), 是用来构建锁或其他同步组件的基础框架，它通过使用 int 变量表示同步状态，通过内置的 FIFO 的队列完成资源获取的排队工作。（摘自《Java并发编程的艺术》）
+
+我们知道获取同步状态有独占和共享两种模式，本文先针对独占模式进行分析。
+变量定义p...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-02
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                
+                <div class="col-md-4">
+                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" style="background-image: url(/img/post2.jpeg)" class="post-index-img" target="_self"></a> 
+                </div>
+            
+                <div class="col-md-7">
+                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" class="h3 title" target="_self">TCP：三次握手、四次握手、backlog及其他</a>
+                    
+                    <p>参考博客　TCP：三次握手、四次握手、backlog及其他
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-03-13
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
                 
                 <div class="col-md-4">
                     <a href="/2018/03/11/Java内存模型/" style="background-image: url(/img/post1.jpg)" class="post-index-img" target="_self"></a> 
@@ -302,58 +355,6 @@
                             <i class="material-icons">bookmark_border</i>
                                 
                                     jdk &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/01/20/Netty客户端链接派发分析/" class="h3 title" target="_self">Netty客户端链接派发分析</a>
-                    
-                    <p>在上篇针对 Netty 的服务端启动过程进行了分析，我们知道服务端包含了两个 NioEventLoopGroup, 一个是 boss 用于接收客户端的请求，一个是 worker 用于处理客户端的读写操作；那么 boss group 是如何将客户端链接通道派发到 worker 呢？本文主要针对这个问题进行分析。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-20
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    netty &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/01/17/Netty服务端启动源码分析/" class="h3 title" target="_self">Netty服务端启动源码分析</a>
-                    
-                    <p>  Netty 是一个高性能异步事件驱动的 NIO 框架, 因其底层采用的 NIO, 故其启动过程一样可以分为以下几个步骤:
-
-selector 多路复用选择器开启
-ServerSocketChannel 通道建立并绑定端口
-ServerSocketChannel 通道注册到 selector 并监听 accept 事件
-
-在进行服务端启动分析前，我们先看下 netty 的服务端使用示例。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-17
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    netty &nbsp;
                                 
                         
                     </p>

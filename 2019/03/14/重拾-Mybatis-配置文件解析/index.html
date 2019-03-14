@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>重拾-MyBatis-配置文件解析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">重拾-MyBatis-配置文件解析</h1>
+        <p class="text-center"><b>星期四, 三月 14日 2019, 1:44 下午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>我们知道在使用 <code>Mybatis</code> 时，我们需要通过 <code>SqlSessionFactoryBuild</code> 去创建 <code>SqlSessionFactory</code> 实例，譬如：</p>
+<pre><code class="java">// resource 为 mybatis 的配置文件 
+InputStream inputStream = Resources.getResourceAsStream(resource);
+SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(inputStream);
+</code></pre>
+<p>那么我们看下 <code>build</code> 方法的具体实现</p>
+<pre><code class="java">public SqlSessionFactory build(Reader reader, String environment, Properties properties) {
+    try {
+        // 创建 XMLConfigBuilder 实例并执行解析
+      XMLConfigBuilder parser = new XMLConfigBuilder(reader, environment, properties);
+      return build(parser.parse());
+    } catch (Exception e) {
+      throw ExceptionFactory.wrapException(&quot;Error building SqlSession.&quot;, e);
+    } finally {
+      ErrorContext.instance().reset();
+      try {
+        reader.close();
+      } catch (IOException e) {
+
+      }
+    }
+}
+
+public Configuration parse() {
+    if (parsed) {
+      throw new BuilderException(&quot;Each XMLConfigBuilder can only be used once.&quot;);
+    }
+    parsed = true;
+    parseConfiguration(parser.evalNode(&quot;/configuration&quot;));
+    return configuration;
+}
+</code></pre>
+<p><code>Mybatis</code> 主要通过 <code>XMLConfigBuilder</code> 执行对配置文件的解析，具体实现如下文：</p>
+<h2 id="配置文件解析"><a href="#配置文件解析" class="headerlink" title="配置文件解析"></a>配置文件解析</h2><pre><code class="java">private void parseConfiguration(XNode root) {
+    try {
+      //issue #117 read properties first
+      // 解析 properties 标签
+      propertiesElement(root.evalNode(&quot;properties&quot;));
+      // 解析 settings 标签
+      Properties settings = settingsAsProperties(root.evalNode(&quot;settings&quot;));
+      loadCustomVfs(settings);
+      loadCustomLogImpl(settings);
+      // 解析 typeAliases 别名标签
+      typeAliasesElement(root.evalNode(&quot;typeAliases&quot;));
+      // 解析 plugins 插件标签
+      pluginElement(root.evalNode(&quot;plugins&quot;));
+      objectFactoryElement(root.evalNode(&quot;objectFactory&quot;));
+      objectWrapperFactoryElement(root.evalNode(&quot;objectWrapperFactory&quot;));
+      reflectorFactoryElement(root.evalNode(&quot;reflectorFactory&quot;));
+      settingsElement(settings);
+      // read it after objectFactory and objectWrapperFactory issue #631
+      // 解析 environments 标签
+      environmentsElement(root.evalNode(&quot;environments&quot;));
+      databaseIdProviderElement(root.evalNode(&quot;databaseIdProvider&quot;));
+      // 解析 typeHandlers 标签
+      typeHandlerElement(root.evalNode(&quot;typeHandlers&quot;));
+      // 解析 mappers 标签
+      mapperElement(root.evalNode(&quot;mappers&quot;));
+    } catch (Exception e) {
+      throw new BuilderException(&quot;Error parsing SQL Mapper Configuration. Cause: &quot; + e, e);
+    }
+}
+</code></pre>
+<p>从 <code>XMLConfigBuilder</code> 的方法 <code>parseConfiguration</code> 实现我们知道，<code>MyBatis</code> 会依次解析配置文件中的相应标签，本文将针对开发中常用的配置进行分析；主要包括 <code>properties</code>, <code>typeAliases</code>, <code>enviroments</code>, <code>typeHandlers</code>, <code>mappers</code> 。</p>
+<h3 id="properties-解析"><a href="#properties-解析" class="headerlink" title="properties 解析"></a>properties 解析</h3><h4 id="配置示例"><a href="#配置示例" class="headerlink" title="配置示例"></a>配置示例</h4><pre><code class="xml">&lt;configuration&gt;
+    &lt;!-- 可以指定 resource 属性，也可以指定 url 属性 --&gt;
+    &lt;properties resource=&quot;org/mybatis/example/config.properties&quot;&gt;
+          &lt;property name=&quot;username&quot; value=&quot;dev_user&quot;/&gt;
+          &lt;property name=&quot;password&quot; value=&quot;F2Fa3!33TYyg&quot;/&gt;
+    &lt;/properties&gt;
+
+&lt;/configuration&gt;
+</code></pre>
+<p>从配置示例可以看出 <code>properties</code> 属性变量的来源可以是外部的配置文件，也可以是配置文件中自定义的，也可以是 <code>SqlSessionFactoryBuilder</code> 的 <code>build</code> 方法传参譬如：</p>
+<pre><code class="java">public SqlSessionFactory build(InputStream inputStream, Properties properties) {
+    return build(inputStream, null, properties);
+  }
+</code></pre>
+<blockquote>
+<p>那么当存在同名的属性时，将采用哪种方式的属性值呢？ </p>
+</blockquote>
+<h4 id="解析"><a href="#解析" class="headerlink" title="解析"></a>解析</h4><pre><code class="java">private void propertiesElement(XNode context) throws Exception {
+    if (context != null) {
+      // 获取 properties 标签下的所有 property 子标签
+      Properties defaults = context.getChildrenAsProperties();
+      // 获取 resource，url 属性
+      String resource = context.getStringAttribute(&quot;resource&quot;);
+      String url = context.getStringAttribute(&quot;url&quot;);
+
+      // resource url 两个属性不能同时存在
+      if (resource != null &amp;&amp; url != null) {
+        throw new BuilderException(&quot;The properties element cannot specify both a URL and a resource based property file reference.  Please specify one or the other.&quot;);
+      }
+      if (resource != null) {
+        // 加载 resource 指定的配置文件
+        defaults.putAll(Resources.getResourceAsProperties(resource));
+      } else if (url != null) {
+        // 加载 url 指定的配置文件
+        defaults.putAll(Resources.getUrlAsProperties(url));
+      }
+
+      /**
+       * 获取传参的 properties
+       * 构建 sqlSessionFactory 时可以传参 properties
+       *
+       * @see SqlSessionFactoryBuilder.build(InputStream inputStream, Properties properties)
+       */
+      Properties vars = configuration.getVariables();
+      if (vars != null) {
+        defaults.putAll(vars);
+      }
+      parser.setVariables(defaults);
+      // 将 properties 赋值 configuration 中的 variables 变量
+      configuration.setVariables(defaults);
+    }
+  }
+</code></pre>
+<pre><code class="java">public Properties getChildrenAsProperties() {
+    Properties properties = new Properties();
+    // 遍历 properties 标签下的 propertry 子标签
+    for (XNode child : getChildren()) {
+      // 获取 propertry 的 name value 属性
+      String name = child.getStringAttribute(&quot;name&quot;);
+      String value = child.getStringAttribute(&quot;value&quot;);
+      if (name != null &amp;&amp; value != null) {
+        properties.setProperty(name, value);
+      }
+    }
+    return properties;
+  }
+</code></pre>
+<p>从 <code>properties</code> 标签解析的实现来看，<code>MyBatis</code> 加载 <code>properties</code> 属性的过程如下：</p>
+<ul>
+<li>首先加载 <code>properties</code> 标签内所有子标签的 <code>property</code></li>
+<li>其次加载 <code>properties</code> 标签属性 <code>resource</code> 或 <code>url</code> 指定的外部属性配置</li>
+<li>最后加载 <code>SqlSessionFactoryBuilder</code> 的方法 <code>build</code> 传参的属性配置</li>
+</ul>
+<blockquote>
+<p>因此，通过方法参数传递的 <code>properties</code> 具有最高优先级，resource/url 属性中指定的配置文件次之，最低优先级的是 <code>properties</code> 标签内的子标签 <code>property</code> 指定的属性。</p>
+</blockquote>
+<h3 id="typeAliases-解析"><a href="#typeAliases-解析" class="headerlink" title="typeAliases 解析"></a>typeAliases 解析</h3><blockquote>
+<p>类型别名是为 Java 类型设置一个短的名字。它只和 XML 配置有关，存在的意义仅在于用来减少类完全限定名的冗余</p>
+</blockquote>
+<h4 id="配置示例-1"><a href="#配置示例-1" class="headerlink" title="配置示例"></a>配置示例</h4><pre><code class="xml">&lt;typeAliases&gt;
+  &lt;typeAlias alias=&quot;Author&quot; type=&quot;domain.blog.Author&quot;/&gt;
+  &lt;typeAlias alias=&quot;Blog&quot; type=&quot;domain.blog.Blog&quot;/&gt;
+  &lt;typeAlias alias=&quot;Comment&quot; type=&quot;domain.blog.Comment&quot;/&gt;
+&lt;/typeAliases&gt;
+</code></pre>
+<p>也可以指定一个包名，<code>MyBatis</code> 会在包名下面搜索需要的 Java Bean，比如:</p>
+<pre><code class="xml">&lt;typeAliases&gt;
+  &lt;package name=&quot;domain.blog&quot;/&gt;
+&lt;/typeAliases&gt;
+</code></pre>
+<h4 id="解析-1"><a href="#解析-1" class="headerlink" title="解析"></a>解析</h4><pre><code class="java">private void typeAliasesElement(XNode parent) {
+    if (parent != null) {
+      for (XNode child : parent.getChildren()) {
+        // 如果是 package 标签，对整个包下的 java bean 进行别名处理
+        // 若 java bean 没有配置注解的话，使用 bean 的首字母小写类名作为别名
+        // 若 java bean 配置了注解，使用注解值作为别名
+        if (&quot;package&quot;.equals(child.getName())) {
+          // 获取指定的包名
+          String typeAliasPackage = child.getStringAttribute(&quot;name&quot;);
+          configuration.getTypeAliasRegistry().registerAliases(typeAliasPackage);
+        } else {
+          // 别名
+          String alias = child.getStringAttribute(&quot;alias&quot;);
+          // 别名对应的类
+          String type = child.getStringAttribute(&quot;type&quot;);
+          try {
+            Class&lt;?&gt; clazz = Resources.classForName(type);
+            if (alias == null) {
+              // 默认别名为类名，若配置了别名注解则取注解值映射类
+              typeAliasRegistry.registerAlias(clazz);
+            } else {
+              // 通过指定的别名映射类
+              typeAliasRegistry.registerAlias(alias, clazz);
+            }
+          } catch (ClassNotFoundException e) {
+            throw new BuilderException(&quot;Error registering typeAlias for &#39;&quot; + alias + &quot;&#39;. Cause: &quot; + e, e);
+          }
+        }
+      }
+    }
+  }
+</code></pre>
+<p><code>typeAliasesElement</code> 在对 <code>typeAliases</code> 标签解析时，针对采用 <code>package</code> 和 <code>typeAlias</code> 两种配置方式进行了不同的解析。 下面我们先看下通过包名的配置方式</p>
+<h5 id="通过包名解析"><a href="#通过包名解析" class="headerlink" title="通过包名解析"></a>通过包名解析</h5><pre><code class="java">public void registerAliases(String packageName) {
+    registerAliases(packageName, Object.class);
+  }
+
+  public void registerAliases(String packageName, Class&lt;?&gt; superType) {
+      // 获取包下所有的类
+    ResolverUtil&lt;Class&lt;?&gt;&gt; resolverUtil = new ResolverUtil&lt;&gt;();
+    resolverUtil.find(new ResolverUtil.IsA(superType), packageName);
+    Set&lt;Class&lt;? extends Class&lt;?&gt;&gt;&gt; typeSet = resolverUtil.getClasses();
+    for (Class&lt;?&gt; type : typeSet) {
+      // Ignore inner classes and interfaces (including package-info.java)
+      // Skip also inner classes. See issue #6
+      // 忽略内部类 接口
+      if (!type.isAnonymousClass() &amp;&amp; !type.isInterface() &amp;&amp; !type.isMemberClass()) {
+        registerAlias(type);
+      }
+    }
+  }
+
+  public void registerAlias(Class&lt;?&gt; type) {
+    // 别名为类名
+    String alias = type.getSimpleName();
+    // 是否配置了别名注解，若配置了则别名取注解值
+    Alias aliasAnnotation = type.getAnnotation(Alias.class);
+    if (aliasAnnotation != null) {
+      alias = aliasAnnotation.value();
+    }
+    registerAlias(alias, type);
+  }
+</code></pre>
+<p>当通过 <code>package</code> 指定包名时，<code>MyBatis</code> 会扫描包下所有的类（忽略内部类，接口），若类没有采用 <code>@Alias</code> 注解的情况下，会使用 Bean 的首字母小写的非限定类名来作为它的别名, 比如 <code>domain.blog.Author</code> 的别名为 author；若有注解，则别名为其注解值。</p>
+<pre><code class="java">public void registerAlias(String alias, Class&lt;?&gt; value) {
+    if (alias == null) {
+      throw new TypeException(&quot;The parameter alias cannot be null&quot;);
+    }
+    // issue #748
+    // 别名小写处理
+    String key = alias.toLowerCase(Locale.ENGLISH);
+    if (typeAliases.containsKey(key) &amp;&amp; typeAliases.get(key) != null &amp;&amp; !typeAliases.get(key).equals(value)) {
+      throw new TypeException(&quot;The alias &#39;&quot; + alias + &quot;&#39; is already mapped to the value &#39;&quot; + typeAliases.get(key).getName() + &quot;&#39;.&quot;);
+    }
+    // 别名与类映射
+    typeAliases.put(key, value);
+  }
+</code></pre>
+<p>在完成别名的解析之后会将其注册到 <code>typeAliasRegistry</code> 的变量 <code>typeAliases</code> Map 集合中。</p>
+<h3 id="配置环境-environments-解析"><a href="#配置环境-environments-解析" class="headerlink" title="配置环境 environments 解析"></a>配置环境 environments 解析</h3><blockquote>
+<p><code>environments</code> 用于事务管理器及数据源相关配置</p>
+</blockquote>
+<h4 id="配置示例-2"><a href="#配置示例-2" class="headerlink" title="配置示例"></a>配置示例</h4><pre><code class="xml">&lt;environments default=&quot;development&quot;&gt;
+  &lt;environment id=&quot;development&quot;&gt;
+    &lt;transactionManager type=&quot;JDBC&quot;&gt;
+      &lt;property name=&quot;...&quot; value=&quot;...&quot;/&gt;
+    &lt;/transactionManager&gt;
+    &lt;dataSource type=&quot;POOLED&quot;&gt;
+      &lt;property name=&quot;driver&quot; value=&quot;${driver}&quot;/&gt;
+      &lt;property name=&quot;url&quot; value=&quot;${url}&quot;/&gt;
+      &lt;property name=&quot;username&quot; value=&quot;${username}&quot;/&gt;
+      &lt;property name=&quot;password&quot; value=&quot;${password}&quot;/&gt;
+    &lt;/dataSource&gt;
+  &lt;/environment&gt;
+  &lt;environment id=&quot;test&quot;&gt;
+    &lt;transactionManager type=&quot;JDBC&quot;&gt;
+      &lt;property name=&quot;...&quot; value=&quot;...&quot;/&gt;
+    &lt;/transactionManager&gt;
+    &lt;dataSource type=&quot;POOLED&quot;&gt;
+      &lt;property name=&quot;driver&quot; value=&quot;${driver}&quot;/&gt;
+      &lt;property name=&quot;url&quot; value=&quot;${url}&quot;/&gt;
+      &lt;property name=&quot;username&quot; value=&quot;${username}&quot;/&gt;
+      &lt;property name=&quot;password&quot; value=&quot;${password}&quot;/&gt;
+    &lt;/dataSource&gt;
+  &lt;/environment&gt;
+&lt;/environments&gt;
+</code></pre>
+<blockquote>
+<p>从 <code>environments</code> 的配置来看 <code>MyBatis</code> 是支持多数据源的，但每个 <code>SqlSessionFactory</code> 实例只能选择其中一个； 若需要连接多个数据库，就得需要创建多个 <code>SqlSessinFactory</code> 实例。</p>
+</blockquote>
+<h4 id="解析-2"><a href="#解析-2" class="headerlink" title="解析"></a>解析</h4><pre><code class="java">private void environmentsElement(XNode context) throws Exception {
+    if (context != null) {
+      if (environment == null) {
+        /**
+         * @see org.apache.ibatis.session.SqlSessionFactoryBuilder.build 时未指定 enviorment, 则取默认的
+         */
+        environment = context.getStringAttribute(&quot;default&quot;);
+      }
+      for (XNode child : context.getChildren()) {
+        String id = child.getStringAttribute(&quot;id&quot;);
+        // 查找与 environment 匹配的配置环境
+        if (isSpecifiedEnvironment(id)) {
+          // 解析事务管理
+          TransactionFactory txFactory = transactionManagerElement(child.evalNode(&quot;transactionManager&quot;));
+          // 解析数据源
+          DataSourceFactory dsFactory = dataSourceElement(child.evalNode(&quot;dataSource&quot;));
+          // 获取数据源实例
+          DataSource dataSource = dsFactory.getDataSource();
+          Environment.Builder environmentBuilder = new Environment.Builder(id)
+              .transactionFactory(txFactory)
+              .dataSource(dataSource);
+          // 设置配置环境
+          configuration.setEnvironment(environmentBuilder.build());
+        }
+      }
+    }
+  }
+</code></pre>
+<pre><code class="java">private boolean isSpecifiedEnvironment(String id) {
+    if (environment == null) {
+        // 若 environment 为空说明未指定当前 SqlSessionFactory 实例所需的配置环境；同时 environments 标签未配置 default 属性
+      throw new BuilderException(&quot;No environment specified.&quot;);
+    } else if (id == null) {
+        // environment 标签需要配置 id 属性
+      throw new BuilderException(&quot;Environment requires an id attribute.&quot;);
+    } else if (environment.equals(id)) {
+        // environment == id 说明当前匹配配置环境
+      return true;
+    }
+    return false;
+  }
+</code></pre>
+<p>因 <code>environments</code> 支持多数据源的配置，所以在解析时会先查找匹配当前 <code>SqlSessionFactory</code> 的 <code>environment</code>; 然后在解析当前配置环境所需的事务管理器和数据源。</p>
+<h5 id="事务管理器解析"><a href="#事务管理器解析" class="headerlink" title="事务管理器解析"></a>事务管理器解析</h5><pre><code class="java">private TransactionFactory transactionManagerElement(XNode context) throws Exception {
+    if (context != null) {
+      // 获取配置事务管理器的类别，也就是别名
+      String type = context.getStringAttribute(&quot;type&quot;);
+      // 获取事务属性配置 
+      Properties props = context.getChildrenAsProperties();
+      // 通过别名查找对应的事务管理器类并实例化
+      TransactionFactory factory = (TransactionFactory) resolveClass(type).newInstance();
+      factory.setProperties(props);
+      return factory;
+    }
+    throw new BuilderException(&quot;Environment declaration requires a TransactionFactory.&quot;);
+  }
+</code></pre>
+<p>事务管理器解析时会通过配置中指定的 <code>type</code> 别名去查找对应的 <code>TransactionFactory</code> 并实例化。</p>
+<blockquote>
+<p>那么 <code>MyBatis</code> 内部内置了哪些事务管理器呢？</p>
+</blockquote>
+<pre><code class="java">public Configuration() {
+    typeAliasRegistry.registerAlias(&quot;JDBC&quot;, JdbcTransactionFactory.class);
+    typeAliasRegistry.registerAlias(&quot;MANAGED&quot;, ManagedTransactionFactory.class);
+
+    // 省略
+  }
+</code></pre>
+<p>从 <code>Configuration</code> 的构造可以看出，其构造时会通过 <code>typeAliasRegistry</code> 注册了别名为 <code>JDBC</code>,<code>MANAGED</code> 的两种事务管理器。</p>
+<h5 id="数据源解析"><a href="#数据源解析" class="headerlink" title="数据源解析"></a>数据源解析</h5><pre><code class="java">private DataSourceFactory dataSourceElement(XNode context) throws Exception {
+    if (context != null) {
+        // 获取配置数据源的类别，也就是别名
+      String type = context.getStringAttribute(&quot;type&quot;);
+      // 获取数据源属性配置
+      Properties props = context.getChildrenAsProperties();
+      // 通过别名查找数据源并实例化
+      DataSourceFactory factory = (DataSourceFactory) resolveClass(type).newInstance();
+      factory.setProperties(props);
+      return factory;
+    }
+    throw new BuilderException(&quot;Environment declaration requires a DataSourceFactory.&quot;);
+  }
+</code></pre>
+<p>同事务管理器一样，数据源解析时也会通过指定的别名查找对应的数据源实现类同样其在 <code>Configuration</code> 构造时向 <code>typeAliasRegistry</code> 注册了三种数据源</p>
+<pre><code class="java">public Configuration() {
+
+    // 省略
+
+    typeAliasRegistry.registerAlias(&quot;JNDI&quot;, JndiDataSourceFactory.class);
+    typeAliasRegistry.registerAlias(&quot;POOLED&quot;, PooledDataSourceFactory.class);
+    typeAliasRegistry.registerAlias(&quot;UNPOOLED&quot;, UnpooledDataSourceFactory.class);
+
+    // 省略
+  }
+</code></pre>
+<h3 id="类型转换器-typeHandlers-解析"><a href="#类型转换器-typeHandlers-解析" class="headerlink" title="类型转换器 typeHandlers 解析"></a>类型转换器 typeHandlers 解析</h3><h4 id="配置示例-3"><a href="#配置示例-3" class="headerlink" title="配置示例"></a>配置示例</h4><pre><code class="xml">&lt;typeHandlers&gt;
+  &lt;typeHandler handler=&quot;org.mybatis.example.ExampleTypeHandler&quot;/&gt;
+&lt;/typeHandlers&gt;
+</code></pre>
+<pre><code class="xml">&lt;typeHandlers&gt;
+  &lt;package name=&quot;org.mybatis.example&quot;/&gt;
+&lt;/typeHandlers&gt;
+</code></pre>
+<h4 id="解析-3"><a href="#解析-3" class="headerlink" title="解析"></a>解析</h4><pre><code class="java">private void typeHandlerElement(XNode parent) {
+    if (parent != null) {
+      for (XNode child : parent.getChildren()) {
+        if (&quot;package&quot;.equals(child.getName())) {
+          String typeHandlerPackage = child.getStringAttribute(&quot;name&quot;);
+          typeHandlerRegistry.register(typeHandlerPackage);
+        } else {
+          // 映射 java 对象类型
+          String javaTypeName = child.getStringAttribute(&quot;javaType&quot;);
+          // 映射 jdbc 类型
+          String jdbcTypeName = child.getStringAttribute(&quot;jdbcType&quot;);
+          // 类型转换器类名
+          String handlerTypeName = child.getStringAttribute(&quot;handler&quot;);
+
+          Class&lt;?&gt; javaTypeClass = resolveClass(javaTypeName);
+          JdbcType jdbcType = resolveJdbcType(jdbcTypeName);
+          Class&lt;?&gt; typeHandlerClass = resolveClass(handlerTypeName);
+          if (javaTypeClass != null) {
+            if (jdbcType == null) {
+              // 指定了 java type，未指定 jdbc type
+              typeHandlerRegistry.register(javaTypeClass, typeHandlerClass);
+            } else {
+              // 指定了 java type，指定了 jdbc type
+              typeHandlerRegistry.register(javaTypeClass, jdbcType, typeHandlerClass);
+            }
+          } else {
+              // 未指定 java type 按 typeHandlerClass 注册
+            typeHandlerRegistry.register(typeHandlerClass);
+          }
+        }
+      }
+    }
+  }
+</code></pre>
+<h5 id="typeHandler-解析"><a href="#typeHandler-解析" class="headerlink" title="typeHandler 解析"></a>typeHandler 解析</h5><h6 id="指定-javaType-和-jdbcType"><a href="#指定-javaType-和-jdbcType" class="headerlink" title="指定 javaType 和 jdbcType"></a>指定 javaType 和 jdbcType</h6><pre><code class="java">public void register(Class&lt;?&gt; javaTypeClass, JdbcType jdbcType, Class&lt;?&gt; typeHandlerClass) {
+    register(javaTypeClass, jdbcType, getInstance(javaTypeClass, typeHandlerClass));
+  }
+</code></pre>
+<pre><code class="java">private void register(Type javaType, JdbcType jdbcType, TypeHandler&lt;?&gt; handler) {
+    if (javaType != null) {
+      // 一个 java type 可能会映射多个 jdbc type
+      Map&lt;JdbcType, TypeHandler&lt;?&gt;&gt; map = typeHandlerMap.get(javaType);
+      if (map == null || map == NULL_TYPE_HANDLER_MAP) {
+        map = new HashMap&lt;&gt;();
+        typeHandlerMap.put(javaType, map);
+      }
+      map.put(jdbcType, handler);
+    }
+
+    // 存储 typeHandler
+    allTypeHandlersMap.put(handler.getClass(), handler);
+  }
+</code></pre>
+<blockquote>
+<p>当指定了 <code>javaType</code> 和 <code>jdbcType</code> 最终会将二者及 <code>typeHandler</code> 映射并注册到 <code>typeHandlerMap</code> 中，从 <code>typeHandlerMap</code> 的数据结构来看，<code>javaType</code> 可能会与多个 <code>jdbcType</code> 映射。 譬如 <code>String</code> -&gt; <code>CHAR</code>,<code>VARCHAR</code> 。</p>
+</blockquote>
+<h6 id="指定-javaType-未指定-jdbcType"><a href="#指定-javaType-未指定-jdbcType" class="headerlink" title="指定 javaType 未指定 jdbcType"></a>指定 javaType 未指定 jdbcType</h6><pre><code class="java">public void register(Class&lt;?&gt; javaTypeClass, Class&lt;?&gt; typeHandlerClass) {
+    // 将 type handler 实例化
+    register(javaTypeClass, getInstance(javaTypeClass, typeHandlerClass));
+  }
+</code></pre>
+<pre><code class="java">private &lt;T&gt; void register(Type javaType, TypeHandler&lt;? extends T&gt; typeHandler) {
+    // 获取 MappedJdbcTypes 注解
+    // 该注解用于设置类型转换器匹配的 jdbcType
+    MappedJdbcTypes mappedJdbcTypes = typeHandler.getClass().getAnnotation(MappedJdbcTypes.class);
+    if (mappedJdbcTypes != null) {
+        // 遍历匹配的 jdbcType 并注册
+      for (JdbcType handledJdbcType : mappedJdbcTypes.value()) {
+        register(javaType, handledJdbcType, typeHandler);
+      }
+      if (mappedJdbcTypes.includeNullJdbcType()) {
+        register(javaType, null, typeHandler);
+      }
+    } else {
+      // 未指定 jdbcType 时按 null 处理    
+      register(javaType, null, typeHandler);
+    }
+  }
+</code></pre>
+<blockquote>
+<p>当类型转换器配置了 <code>javaType</code> 未配置 <code>jdbcType</code> 时，会判断类型转换器是否配置了 <code>@MappedJdbcTypes</code> 注解； 若配置了则使用注解值作为 <code>jdbcType</code> 并注册，若未配置则按 null 注册。</p>
+</blockquote>
+<h6 id="未指定-javaType-和-jdbcType"><a href="#未指定-javaType-和-jdbcType" class="headerlink" title="未指定 javaType 和 jdbcType"></a>未指定 javaType 和 jdbcType</h6><pre><code class="java">public void register(Class&lt;?&gt; typeHandlerClass) {
+    boolean mappedTypeFound = false;
+    // 获取 MappedTypes 注解
+    // 该注解用于设置类型转换器匹配的 javaType
+    MappedTypes mappedTypes = typeHandlerClass.getAnnotation(MappedTypes.class);
+    if (mappedTypes != null) {
+      for (Class&lt;?&gt; javaTypeClass : mappedTypes.value()) {
+          // 执行注册
+        register(javaTypeClass, typeHandlerClass);
+        mappedTypeFound = true;
+      }
+    }
+    if (!mappedTypeFound) {
+      register(getInstance(null, typeHandlerClass));
+    }
+  }
+</code></pre>
+<blockquote>
+<p>当 <code>javaType</code>,<code>jdbcType</code> 均为指定时，会判断类型转换器是否配置了 <code>@MappedTypes</code> 注解； 若配置了则使用注解值作为 <code>javaType</code> 并注册。</p>
+</blockquote>
+<h5 id="package-解析"><a href="#package-解析" class="headerlink" title="package 解析"></a>package 解析</h5><pre><code class="java">public void register(String packageName) {
+    // 扫描指定包下的所有类
+    ResolverUtil&lt;Class&lt;?&gt;&gt; resolverUtil = new ResolverUtil&lt;&gt;();
+    resolverUtil.find(new ResolverUtil.IsA(TypeHandler.class), packageName);
+    Set&lt;Class&lt;? extends Class&lt;?&gt;&gt;&gt; handlerSet = resolverUtil.getClasses();
+    for (Class&lt;?&gt; type : handlerSet) {
+      //Ignore inner classes and interfaces (including package-info.java) and abstract classes
+        // 忽略内部类 接口 抽象类
+      if (!type.isAnonymousClass() &amp;&amp; !type.isInterface() &amp;&amp; !Modifier.isAbstract(type.getModifiers())) {
+          // 执行注册
+        register(type);
+      }
+    }
+  }
+</code></pre>
+<blockquote>
+<p>当按指定包名解析时，会扫描包下的所有类（忽略内部类，接口，抽象类）并执行注册</p>
+</blockquote>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>本文我们主要分析了 <code>Mybatis</code> 配置文件中标签 <code>properties</code>,<code>typeAliases</code>,<code>enviroments</code>,<code>typeHandlers</code> 的解析过程，由于 <code>mappers</code> 的解析比较复杂后续在进行分析；通过本文的分析我们了解到 <code>Configuration</code> 实例中包括以下内容：</p>
+<ul>
+<li>variables : Properties 类型，存储属性变量</li>
+<li>typeAliasRegistry : 别名注册中心，通过一个 Map 集合变量 <code>typeAliases</code> 存储别名与类的映射关系</li>
+<li>environment : 配置环境，绑定事务管理器和当前数据源</li>
+<li>typeHandlerRegistry : 类型转换器注册中心，存储 <code>javaType</code> 与 <code>jdbcType</code>,<code>typeHandler</code> 的映射关系，内置 <code>jdbcType</code> 与 <code>typeHandler</code> 的映射关系</li>
+</ul>
+<p><img src="https://user-gold-cdn.xitu.io/2019/3/14/1697c21d63f7473b?w=2029&amp;h=951&amp;f=png&amp;s=151439" alt="mybatis-configuration"></p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;Mybatis</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

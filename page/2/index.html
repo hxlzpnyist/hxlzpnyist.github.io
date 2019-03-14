@@ -97,6 +97,66 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/12/25/FutureTask/" class="h3 title" target="_self">FutureTask 源码分析</a>
+                    
+                    <p>FutureTask 源码分析
+基于 JDK 1.7 
+
+成员变量    private volatile int state;
+    private static final int NEW          = 0;
+    private static final int COMPLETING   = 1;
+    private stat...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-25
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/22/DelayQueue 延迟阻塞队列使用及分析/" class="h3 title" target="_self">DelayQueue 延迟阻塞队列使用及分析</a>
+                    
+                    <p>延迟阻塞队列 DelayQueue
+DelayQueue 是一个支持延时获取元素的阻塞队列， 内部采用优先队列 PriorityQueue 存储元素，同时元素必须实现 Delayed 接口；在创建元素时可以指定多久才可以从队列中获取当前元素，只有在延迟期满时才能从队列中提取元素。
+
+使用场景
+因延迟阻塞队列的特性， 我们一般将 DelayQueue...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-22
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2018/12/20/ThreadPoolExecutor-线程池的实现分析/" class="h3 title" target="_self">ThreadPoolExecutor线程池的实现分析</a>
                     
                     <p>ThreadPoolExecutor
@@ -336,59 +396,6 @@ Condition 的创建    Lock lock = new ReentrantLock();
                                 
                                     多线程 &nbsp;
                                 
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/12/02/AbstractQueuedSynchronizer-队列同步器源码分析/" class="h3 title" target="_self">AbstractQueuedSynchronizer 队列同步器源码分析</a>
-                    
-                    <p>AbstractQueuedSynchronizer 队列同步器（AQS）
-队列同步器 (AQS), 是用来构建锁或其他同步组件的基础框架，它通过使用 int 变量表示同步状态，通过内置的 FIFO 的队列完成资源获取的排队工作。（摘自《Java并发编程的艺术》）
-
-我们知道获取同步状态有独占和共享两种模式，本文先针对独占模式进行分析。
-变量定义p...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-12-02
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    jdk &nbsp;
-                                
-                                    多线程 &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                
-                <div class="col-md-4">
-                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" style="background-image: url(/img/post2.jpeg)" class="post-index-img" target="_self"></a> 
-                </div>
-            
-                <div class="col-md-7">
-                    <a href="/2018/03/13/TCP：三次握手、四次握手、backlog及其他/" class="h3 title" target="_self">TCP：三次握手、四次握手、backlog及其他</a>
-                    
-                    <p>参考博客　TCP：三次握手、四次握手、backlog及其他
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-03-13
                         
                     </p>
                     
