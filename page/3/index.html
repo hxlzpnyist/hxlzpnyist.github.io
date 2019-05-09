@@ -97,6 +97,67 @@
             
             
                 <div class="col-md-11">
+                    <a href="/2018/12/05/AQS 之 Condition/" class="h3 title" target="_self">AQS 之 Condition-的源码分析</a>
+                    
+                    <p>
+在使用 Lock 锁的过程中，我们往往会使用到另外一个对象 Condition ，用于等待/通知模式的处理。
+
+Condition 的创建    Lock lock = new ReentrantLock();
+    Condition condition = lock.newCondition();
+
+使用 Condition 的前提是获取锁...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-05
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2018/12/04/AbstractQueuedSynchronizer 队列同步器源码分析-共享锁/" class="h3 title" target="_self">AbstractQueuedSynchronizer 队列同步器源码分析-共享锁</a>
+                    
+                    <p>AQS 共享式同步状态获取和释放
+上一篇文章中主要分析了 AQS 的独占模式对同步状态的获取和释放过程，本文主要分析下共享模式下的同步状态的获取和释放是如何实现的
+
+共享锁获取public final void acquireShared(int arg) {
+    if (tryAcquireShared(arg) &lt; 0)
+      ...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-12-04
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                                    多线程 &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
                     <a href="/2018/12/02/AbstractQueuedSynchronizer-队列同步器源码分析/" class="h3 title" target="_self">AbstractQueuedSynchronizer 队列同步器源码分析</a>
                     
                     <p>AbstractQueuedSynchronizer 队列同步器（AQS）
@@ -294,63 +355,6 @@
                     
                     <p class="h6">
                         <i class="material-icons">date_range</i>2018-01-26
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    jdk &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/01/24/jdk之ArrayBlockingQueue/" class="h3 title" target="_self">jdk之ArrayBlockingQueue</a>
-                    
-                    <p>概述ArrayBlockingQueue 又称为数组阻塞队列；其基于数组实现的有界阻塞队列，能容纳的元素数量固定，一旦创建就不能再增加其容量。
-那么接下来我们会带着以下两个疑问进行分析：
-
-如何通过数组实现队列的特性 FIFO ?
-如何保证队列插入获取操作的同步 ?
-...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-24
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    jdk &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/01/24/jdk之BlockingQueue/" class="h3 title" target="_self">jdk之BlockingQueue</a>
-                    
-                    <p>概述BlockingQueue 被称为阻塞队列，除了具备 Queue 的特点外，还支持另外两项重要特性：
-
-对于有界队列，当队列满的时候，插入操作会阻塞等待队列可用；
-
-当队列空的时候，获取元素的操作会阻塞等待队列为非空
-
-阻塞队列常用于“生产者－消费者”模式的业务场景，生产者就是往阻塞队列中插入元素的线程，消费者就是从阻塞队列中获取元素的线程；当生产者的速度大于消费者的速度，就可能出现有界队列满的情况，此时生产者就会出现阻塞等待状态直到队列中出现空闲；当生产者的速度小于消费者的速度就可能出现空队列的情况，消费者就会出现阻塞等待状态，直到队列中有元素。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-01-24
                         
                             <i class="material-icons">bookmark_border</i>
                                 

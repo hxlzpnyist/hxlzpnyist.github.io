@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>重拾-Mybatis-Mapper文件解析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">重拾-Mybatis-Mapper文件解析</h1>
+        <p class="text-center"><b>星期五, 三月 15日 2019, 11:02 上午</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><h2 id="配置示例"><a href="#配置示例" class="headerlink" title="配置示例"></a>配置示例</h2><ul>
+<li>使用相对于类路径的资源引用</li>
+</ul>
+<pre><code class="xml">&lt;mappers&gt;
+  &lt;mapper resource=&quot;org/mybatis/builder/AuthorMapper.xml&quot;/&gt;
+  &lt;mapper resource=&quot;org/mybatis/builder/BlogMapper.xml&quot;/&gt;
+  &lt;mapper resource=&quot;org/mybatis/builder/PostMapper.xml&quot;/&gt;
+&lt;/mappers&gt;
+</code></pre>
+<ul>
+<li>使用完全限定资源定位符（URL）</li>
+</ul>
+<pre><code class="xml">&lt;mappers&gt;
+  &lt;mapper url=&quot;file:///var/mappers/AuthorMapper.xml&quot;/&gt;
+  &lt;mapper url=&quot;file:///var/mappers/BlogMapper.xml&quot;/&gt;
+  &lt;mapper url=&quot;file:///var/mappers/PostMapper.xml&quot;/&gt;
+&lt;/mappers&gt;
+</code></pre>
+<ul>
+<li>使用映射器接口实现类的完全限定类名</li>
+</ul>
+<pre><code class="xml">&lt;mappers&gt;
+  &lt;mapper class=&quot;org.mybatis.builder.AuthorMapper&quot;/&gt;
+  &lt;mapper class=&quot;org.mybatis.builder.BlogMapper&quot;/&gt;
+  &lt;mapper class=&quot;org.mybatis.builder.PostMapper&quot;/&gt;
+&lt;/mappers&gt;
+</code></pre>
+<ul>
+<li>将包内的映射器接口实现全部注册为映射器 </li>
+</ul>
+<pre><code class="xml">&lt;mappers&gt;
+  &lt;package name=&quot;org.mybatis.builder&quot;/&gt;
+&lt;/mappers&gt;
+</code></pre>
+<h2 id="mapper-文件解析"><a href="#mapper-文件解析" class="headerlink" title="mapper 文件解析"></a>mapper 文件解析</h2><pre><code class="java">private void mapperElement(XNode parent) throws Exception {
+    if (parent != null) {
+      for (XNode child : parent.getChildren()) {
+        if (&quot;package&quot;.equals(child.getName())) {
+            // 将包内的映射器接口实现全部注册为映射器 
+          String mapperPackage = child.getStringAttribute(&quot;name&quot;);
+          configuration.addMappers(mapperPackage);
+        } else {
+          String resource = child.getStringAttribute(&quot;resource&quot;);
+          String url = child.getStringAttribute(&quot;url&quot;);
+          String mapperClass = child.getStringAttribute(&quot;class&quot;);
+          if (resource != null &amp;&amp; url == null &amp;&amp; mapperClass == null) {
+            ErrorContext.instance().resource(resource);
+            // 使用相对于类路径的资源引用
+            InputStream inputStream = Resources.getResourceAsStream(resource);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
+            mapperParser.parse();
+          } else if (resource == null &amp;&amp; url != null &amp;&amp; mapperClass == null) {
+            ErrorContext.instance().resource(url);
+            // 使用完全限定资源定位符（URL）
+            InputStream inputStream = Resources.getUrlAsStream(url);
+            XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
+            mapperParser.parse();
+          } else if (resource == null &amp;&amp; url == null &amp;&amp; mapperClass != null) {
+              // 使用映射器接口实现类的完全限定类名
+            Class&lt;?&gt; mapperInterface = Resources.classForName(mapperClass);
+            configuration.addMapper(mapperInterface);
+          } else {
+            throw new BuilderException(&quot;A mapper element may only specify a url, resource or class, but not more than one.&quot;);
+          }
+        }
+      }
+    }
+  }
+</code></pre>
+<h3 id="按-XML-映射文件解析"><a href="#按-XML-映射文件解析" class="headerlink" title="按 XML 映射文件解析"></a>按 XML 映射文件解析</h3><p><code>XMLMapperBuilder</code> 的 <code>parse</code> 方法执行 mapper 接口映射文件的解析</p>
+<pre><code class="java">public void parse() {
+    // 判断 resource 文件是否加载过
+    if (!configuration.isResourceLoaded(resource)) {
+      // 解析 mapper 文件
+      configurationElement(parser.evalNode(&quot;/mapper&quot;));
+      // 将 resource 文件标记为已加载
+      configuration.addLoadedResource(resource);
+      bindMapperForNamespace();
+    }
+
+    parsePendingResultMaps();
+    parsePendingCacheRefs();
+    parsePendingStatements();
+  }
+</code></pre>
+<pre><code class="java">private void configurationElement(XNode context) {
+    try {
+      // 获取 mapper 的命名空间
+      String namespace = context.getStringAttribute(&quot;namespace&quot;);
+      if (namespace == null || namespace.equals(&quot;&quot;)) {
+        throw new BuilderException(&quot;Mapper&#39;s namespace cannot be empty&quot;);
+      }
+      builderAssistant.setCurrentNamespace(namespace);
+      // 解析 cache-ref
+      // 从 configuration 中通过参照的缓存的命名空间获取缓存并复制到当前 mapper
+      cacheRefElement(context.evalNode(&quot;cache-ref&quot;));
+      // 解析 cache
+      // 创建 cache 实例并注册到 configuration 的 caches 容器中
+      cacheElement(context.evalNode(&quot;cache&quot;));
+      parameterMapElement(context.evalNodes(&quot;/mapper/parameterMap&quot;));
+      // 解析 resultMap 标签
+      resultMapElements(context.evalNodes(&quot;/mapper/resultMap&quot;));
+      sqlElement(context.evalNodes(&quot;/mapper/sql&quot;));
+      // 解析 sql 语句标签
+      buildStatementFromContext(context.evalNodes(&quot;select|insert|update|delete&quot;));
+    } catch (Exception e) {
+      throw new BuilderException(&quot;Error parsing Mapper XML. The XML location is &#39;&quot; + resource + &quot;&#39;. Cause: &quot; + e, e);
+    }
+  }
+</code></pre>
+<h4 id="cache-ref-解析"><a href="#cache-ref-解析" class="headerlink" title="cache-ref 解析"></a>cache-ref 解析</h4><blockquote>
+<p>通过配置 <code>cache-ref</code> 引用其他命名空间的缓存配置实例 </p>
+</blockquote>
+<pre><code class="java">private void cacheRefElement(XNode context) {
+    if (context != null) {
+      // 将当前 mapper 命名空间和参照缓存的命名空间进行绑定, 注册到 configuration 的 cacheRefMap
+      configuration.addCacheRef(builderAssistant.getCurrentNamespace(), context.getStringAttribute(&quot;namespace&quot;));
+      CacheRefResolver cacheRefResolver = new CacheRefResolver(builderAssistant, context.getStringAttribute(&quot;namespace&quot;));
+      try {
+        // 获取参照缓存 并绑定到当前 mapper
+        cacheRefResolver.resolveCacheRef();
+      } catch (IncompleteElementException e) {
+        configuration.addIncompleteCacheRef(cacheRefResolver);
+      }
+    }
+  }
+</code></pre>
+<p><code>Configuration</code> 的 <code>addCacheRef</code> 方法如下：</p>
+<pre><code class="java">public void addCacheRef(String namespace, String referencedNamespace) {
+    cacheRefMap.put(namespace, referencedNamespace);
+  }
+</code></pre>
+<blockquote>
+<p>从上述代码发现，解析 <code>cache-ref</code> 标签之后会将当前命名空间和缓存参照的命名空间进行绑定注册到 <code>cacheRefMap</code> 容器中。 </p>
+</blockquote>
+<pre><code class="java">public Cache resolveCacheRef() {
+    // 从参照的命名空间获取 cache 并复制到当前 mapper
+    return assistant.useCacheRef(cacheRefNamespace);
+  }
+</code></pre>
+<pre><code class="java">public Cache useCacheRef(String namespace) {
+    if (namespace == null) {
+      throw new BuilderException(&quot;cache-ref element requires a namespace attribute.&quot;);
+    }
+    try {
+      unresolvedCacheRef = true;
+      // 获取参照的缓存实例
+      Cache cache = configuration.getCache(namespace);
+      if (cache == null) {
+          // 若参照的缓存实例不存在则抛出异常
+        throw new IncompleteElementException(&quot;No cache for namespace &#39;&quot; + namespace + &quot;&#39; could be found.&quot;);
+      }
+      // 将参照的缓存复制到当前缓存实例
+      currentCache = cache;
+      unresolvedCacheRef = false;
+      return cache;
+    } catch (IllegalArgumentException e) {
+      throw new IncompleteElementException(&quot;No cache for namespace &#39;&quot; + namespace + &quot;&#39; could be found.&quot;, e);
+    }
+  }
+</code></pre>
+<p>从 <code>resolveCacheRef</code> 的操作来看，在解析参照缓存的命名空间之后，会从 <code>configuration</code> 的 <code>caches</code> 缓存容器中获取参照缓存实例，若存在参照缓存则将其复制到当前命名空间下，反之抛出异常。</p>
+<h4 id="cache-解析"><a href="#cache-解析" class="headerlink" title="cache 解析"></a>cache 解析</h4><pre><code class="java">private void cacheElement(XNode context) {
+    if (context != null) {
+      // 获取缓存的实现类，默认为 PERPETUAL，也就是 PerpetualCache 类
+      String type = context.getStringAttribute(&quot;type&quot;, &quot;PERPETUAL&quot;);
+      Class&lt;? extends Cache&gt; typeClass = typeAliasRegistry.resolveAlias(type);
+
+      // 获取缓存的回收策略，默认为 LRU 策略，也就是 LruCache
+      String eviction = context.getStringAttribute(&quot;eviction&quot;, &quot;LRU&quot;);
+      Class&lt;? extends Cache&gt; evictionClass = typeAliasRegistry.resolveAlias(eviction);
+      // 获取缓存刷新时间间隔
+      Long flushInterval = context.getLongAttribute(&quot;flushInterval&quot;);
+      Integer size = context.getIntAttribute(&quot;size&quot;);
+      boolean readWrite = !context.getBooleanAttribute(&quot;readOnly&quot;, false);
+      boolean blocking = context.getBooleanAttribute(&quot;blocking&quot;, false);
+      Properties props = context.getChildrenAsProperties();
+      // 创建缓存对象
+      builderAssistant.useNewCache(typeClass, evictionClass, flushInterval, size, readWrite, blocking, props);
+    }
+  }
+</code></pre>
+<pre><code class="java">public Cache useNewCache(Class&lt;? extends Cache&gt; typeClass,
+      Class&lt;? extends Cache&gt; evictionClass,
+      Long flushInterval,
+      Integer size,
+      boolean readWrite,
+      boolean blocking,
+      Properties props) {
+    // 设置缓存命名空间,也就是 cache 的 id
+    // 设置缓存的实现类, 默认为 PerpetualCache
+    // 设置缓存的回收策略，默认为 LruCache
+    Cache cache = new CacheBuilder(currentNamespace)
+        .implementation(valueOrDefault(typeClass, PerpetualCache.class))
+        .addDecorator(valueOrDefault(evictionClass, LruCache.class))
+        .clearInterval(flushInterval)
+        .size(size)
+        .readWrite(readWrite)
+        .blocking(blocking)
+        .properties(props)
+        .build();
+    // 将 cache 添加到
+    configuration.addCache(cache);
+    currentCache = cache;
+    return cache;
+  }
+</code></pre>
+<p>解析 <code>cache</code> 的流程很简单，其过程如下：</p>
+<ul>
+<li>获取缓存的实现类 <code>type</code> 属性，默认为 <code>PerpetualCache</code></li>
+<li>获取缓存的回收策略 <code>eviction</code> 属性， 默认为 <code>LRU</code> 策略</li>
+<li>获取缓存刷新时间，size 等熟悉</li>
+<li>通过 <code>builderAssistant</code> (mapper 构造助手) 创建 cache 实例</li>
+<li>将 cache 实例注册到 <code>configuration</code> 的 <code>caches</code> 容器中</li>
+</ul>
+<h4 id="resultMap-解析"><a href="#resultMap-解析" class="headerlink" title="resultMap 解析"></a>resultMap 解析</h4><pre><code class="java">  private ResultMap resultMapElement(XNode resultMapNode, List&lt;ResultMapping&gt; additionalResultMappings, Class&lt;?&gt; enclosingType) throws Exception {
+    ErrorContext.instance().activity(&quot;processing &quot; + resultMapNode.getValueBasedIdentifier());
+    // 获取映射的类
+    String type = resultMapNode.getStringAttribute(&quot;type&quot;,
+        resultMapNode.getStringAttribute(&quot;ofType&quot;,
+            resultMapNode.getStringAttribute(&quot;resultType&quot;,
+                resultMapNode.getStringAttribute(&quot;javaType&quot;))));
+    Class&lt;?&gt; typeClass = resolveClass(type);
+    if (typeClass == null) {
+      typeClass = inheritEnclosingType(resultMapNode, enclosingType);
+    }
+    Discriminator discriminator = null;
+    List&lt;ResultMapping&gt; resultMappings = new ArrayList&lt;&gt;();
+    // 遍历 resultMap 标签下的子标签 常用的为 id, result 标签
+    resultMappings.addAll(additionalResultMappings);
+    List&lt;XNode&gt; resultChildren = resultMapNode.getChildren();
+    for (XNode resultChild : resultChildren) {
+      if (&quot;constructor&quot;.equals(resultChild.getName())) {
+        processConstructorElement(resultChild, typeClass, resultMappings);
+      } else if (&quot;discriminator&quot;.equals(resultChild.getName())) {
+        discriminator = processDiscriminatorElement(resultChild, typeClass, resultMappings);
+      } else {
+        List&lt;ResultFlag&gt; flags = new ArrayList&lt;&gt;();
+        if (&quot;id&quot;.equals(resultChild.getName())) {
+          flags.add(ResultFlag.ID);
+        }
+        // ResultMapping 存储的是 标签 result 的内容 包括java bean 属性与 db 列的映射关系
+        resultMappings.add(buildResultMappingFromContext(resultChild, typeClass, flags));
+      }
+    }
+    // 获取 resultMap 的 id
+    String id = resultMapNode.getStringAttribute(&quot;id&quot;,
+            resultMapNode.getValueBasedIdentifier());
+    String extend = resultMapNode.getStringAttribute(&quot;extends&quot;);
+    Boolean autoMapping = resultMapNode.getBooleanAttribute(&quot;autoMapping&quot;);
+
+    // ResultMap 存储的是 标签 resultMap 的内容
+    // 其包括了 ResultMapping 集合，二者一对多的关系
+    ResultMapResolver resultMapResolver = new ResultMapResolver(builderAssistant, id, typeClass, extend, discriminator, resultMappings, autoMapping);
+    try {
+      return resultMapResolver.resolve();
+    } catch (IncompleteElementException  e) {
+      configuration.addIncompleteResultMap(resultMapResolver);
+      throw e;
+    }
+  }
+</code></pre>
+<h3 id="按-mapper-接口解析"><a href="#按-mapper-接口解析" class="headerlink" title="按 mapper 接口解析"></a>按 mapper 接口解析</h3>
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;Mybatis</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>

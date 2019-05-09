@@ -97,16 +97,95 @@
             
             
                 <div class="col-md-11">
-                    <a href="/2019/03/14/重拾-Mybatis-配置文件解析/" class="h3 title" target="_self">重拾-MyBatis-配置文件解析</a>
+                    <a href="/2019/04/20/zookeeper-选举源码分析/" class="h3 title" target="_self">zookeeper-选举源码分析</a>
                     
-                    <p>前言我们知道在使用 Mybatis 时，我们需要通过 SqlSessionFactoryBuild 去创建 SqlSessionFactory 实例，譬如：
-// resource 为 mybatis 的配置文件 
-InputStream inputStream = Resources.getResourceAsStream(resource);
-...</p>
+                    <p>在 zookeeper 集群中发生选举的场景有以下三种：
+
+集群启动时
+Leader 节点重启时
+Follower 节点重启时
+
+本文主要针对集群启动时发生的选举实现进行分析。
+
+ZK 集群中节点在启动时会调用QuorumPeer.start方法
+
+public synchronized void start() {
+    /**
+     * ...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2019-03-14
+                        <i class="material-icons">date_range</i>2019-04-20
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    zookeeper &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2019/04/14/声网sdk体验-直播/" class="h3 title" target="_self">声网sdk体验-直播</a>
+                    
+                    <p>概述直播如何实现的？
+下面是基于声网 sdk 快速开发简单直播demo的实现。
+功能设计
+如上图所示为直播 Demo 实现的基本功能展示，包括：
+
+主播端：
+
+
+创建直播间
+发布、取消发布视频
+下播
+浏览发送弹幕
+
+
+访客端：
+
+
+浏览直播间
+观看直播
+退出直播间
+浏览发送弹幕
+
+下面看下本次实现的简易架构图：
+
+实现在实现之前我们需要创建 Ago...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2019-04-14
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
+                <div class="col-md-11">
+                    <a href="/2019/03/15/重拾-Mybatis-Mapper文件解析/" class="h3 title" target="_self">重拾-Mybatis-Mapper文件解析</a>
+                    
+                    <p>前言配置示例
+使用相对于类路径的资源引用
+
+&lt;mappers&gt;
+  &lt;mapper resource=&quot;org/mybatis/builder/AuthorMapper.xml&quot;/&gt;
+  &lt;mapper resource=&quot;org/mybatis/builder/BlogMapper.xm...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2019-03-15
                         
                             <i class="material-icons">bookmark_border</i>
                                 
@@ -123,14 +202,16 @@ InputStream inputStream = Resources.getResourceAsStream(resource);
             
             
                 <div class="col-md-11">
-                    <a href="/2019/03/13/重拾-Mybatis-Mapper文件解析/" class="h3 title" target="_self">重拾-Mybatis-Mapper文件解析</a>
+                    <a href="/2019/03/14/重拾-Mybatis-配置文件解析/" class="h3 title" target="_self">重拾-MyBatis-配置文件解析</a>
                     
-                    <p>## 
+                    <p>前言我们知道在使用 Mybatis 时，我们需要通过 SqlSessionFactoryBuild 去创建 SqlSessionFactory 实例，譬如：
+// resource 为 mybatis 的配置文件 
+InputStream inputStream = Resources.getResourceAsStream(resource);
 ...</p>
                     
                     
                     <p class="h6">
-                        <i class="material-icons">date_range</i>2019-03-13
+                        <i class="material-icons">date_range</i>2019-03-14
                         
                             <i class="material-icons">bookmark_border</i>
                                 
@@ -300,64 +381,6 @@ spring...</p>
                             <i class="material-icons">bookmark_border</i>
                                 
                                     LeetCode &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2019/02/24/LeetCode-数组-三数之和/" class="h3 title" target="_self">LeetCode-数组-三数之和</a>
-                    
-                    <p>题目描述给定一个包含 n 个整数的数组 nums，判断 nums 中是否存在三个元素 a，b，c ，使得 a + b + c = 0 ？找出所有满足条件且不重复的三元组。
-注意：答案中不可以包含重复的三元组。 习题原文
-解题思路
-求三数之和为 0, nums[i] + nums[j] + nums[k] = 0 可以转换为求两个数之和，也即是 nu...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2019-02-24
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    LeetCode &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2018/12/28/Thread的中断理解/" class="h3 title" target="_self">Thread的中断理解</a>
-                    
-                    <p>Thread 的中断理解
-首先我们需要明确一个概念 中断并非是终止。 
-
-interrupt()
-线程中断方法, 调用该方法时会将线程的中断标志位标记为 true; (注意你可以理解为只是单纯的改变下标记，并不是使线程停止运行)
-
-isInterrupted()
-获取线程的中断标志位，也就是判断是否被中断过; true 表示被中断过
-
-Interr...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2018-12-28
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    多线程 &nbsp;
                                 
                         
                     </p>
