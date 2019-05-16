@@ -96,6 +96,40 @@
         <div class="row post-card">
             
             
+                
+                <div class="col-md-4">
+                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" style="background-image: url(/img/post4.jpg)" class="post-index-img" target="_self"></a> 
+                </div>
+            
+                <div class="col-md-7">
+                    <a href="/2018/01/26/jdk之LinkedBlockingQueue/" class="h3 title" target="_self">jdk之LinkedBlockingQueue</a>
+                    
+                    <p>概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。
+分析前我们同样有以下疑问：
+
+如何通过链表实现队列的 FIFO ?
+如何保证队列操作的同步 ?
+与 ArrayBlockingQueue 相比有如何优势 ?
+...</p>
+                    
+                    
+                    <p class="h6">
+                        <i class="material-icons">date_range</i>2018-01-26
+                        
+                            <i class="material-icons">bookmark_border</i>
+                                
+                                    jdk &nbsp;
+                                
+                        
+                    </p>
+                    
+                </div>
+        </div>
+       
+        
+        <div class="row post-card">
+            
+            
                 <div class="col-md-11">
                     <a href="/2018/01/24/jdk之ArrayBlockingQueue/" class="h3 title" target="_self">jdk之ArrayBlockingQueue</a>
                     
@@ -358,46 +392,6 @@ Limit : 表示buffer最多可写或可读的数量。写模式下limit = capacit
                                     NIO &nbsp;
                                 
                                     bytebuffer &nbsp;
-                                
-                        
-                    </p>
-                    
-                </div>
-        </div>
-       
-        
-        <div class="row post-card">
-            
-            
-                <div class="col-md-11">
-                    <a href="/2017/12/12/zookeeper源码阅读之server/" class="h3 title" target="_self">zookeeper源码阅读之server</a>
-                    
-                    <p>zookeeper server 启动流程概述
-此次只针对单机模式对 server 端的启动流程分析, 首先看下 zookeeper server 启动时序图，如下：
-
-
-
-其启动流程如下：
-
-执行 zkServer.sh start 脚本, 会调用 QuorumPeerMain.main(); 执行 initializeAndRun 方法
-调用 QuorumPeerConfig.parse() 方法，该方法主要是对启动参数的解析并加载相应的配置文件
-通过上文解析的配置, 判断当前启动模式是否为集群或单机模式
-单机模式下调用 ZookeeperServerMain.main() 方法
-执行 ZookeeperServerMain.initializeAndRun 方法
-调用 ServerConfig.parse 再次解析启动参数加载配置文件
-调用 runFromConfig , 在该方法中依次启动 JettyAdminServer.start(), NIOServerCnxnFactory.startup()
-
-
-
-至此 zookeeper server 完成单机模式下启动，接下来将详细看下 NIOServerCnxnFactory.startup 的启动过程。...</p>
-                    
-                    
-                    <p class="h6">
-                        <i class="material-icons">date_range</i>2017-12-12
-                        
-                            <i class="material-icons">bookmark_border</i>
-                                
-                                    zookeeper &nbsp;
                                 
                         
                     </p>

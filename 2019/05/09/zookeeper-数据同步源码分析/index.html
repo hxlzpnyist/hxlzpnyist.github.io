@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+
+
+
+
+
+
+
+
+
+<head><meta name="generator" content="Hexo 3.8.0">
+    <meta charset="utf-8">
+    <link rel="apple-touch-icon" sizes="76x76" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, shrink-to-fit=no" name="viewport">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="description" content>
+    <meta name="author" content="hxlzpnyist">
+    <meta name="keywords" content>
+    <title>zookeeper-数据同步源码分析 ~ 断风雨</title>
+    <link rel="stylesheet" href="/css/Material_Icons.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/latest/css/font-awesome.min.css">
+    <link rel="stylesheet" href="/css/main.css">
+    
+        <link rel="stylesheet" href="/css/post.css">
+        
+            <link rel="stylesheet" href="/css/Prettify/tomorrow-night-eighties.min.css">
+        
+    
+</head>
+
+<body class=" sidebar-collapse">
+<nav class="navbar navbar-transparent navbar-color-on-scroll fixed-top navbar-expand-lg" color-on-scroll="100" id="sectionsNav">
+    <div class="container">
+        <div class="navbar-translate">
+            <a class="navbar-brand" href="/">
+                断风雨</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav ml-auto">
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/archives/">
+                                    归档
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" href="/about/">
+                                    关于
+                                </a>
+                            </li>
+                        
+                    
+                    
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://github.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-github"></i>
+                                </a>
+                            </li>
+                        
+                            <li class="nav-item">
+                                <a class="nav-link" rel="tooltip" title data-placement="bottom" href="https://twitter.com/" target="_blank" data-original-title="See me here">
+                                    <i class="fa fa-twitter"></i>
+                                </a>
+                            </li>
+                        
+                    
+                </ul>
+            </div>
+    </div>
+</nav>
+    
+  <div class="page-header header-filter" data-parallax="false" style="background-image: url('/img/post-banner.jpg'); height: 70vh;">
+    
+      <div class="container">
+        <h1 class="title text-center post_title">zookeeper-数据同步源码分析</h1>
+        <p class="text-center"><b>星期四, 五月 9日 2019, 6:09 晚上</b></p>
+      </div>
+    
+  </div>
+
+  
+  
+  
+    <div class="row" style="margin: 0 0 0; z-index: 999;">
+  <div class="col-md-8 offset-md-1">
+    <div class="main main-raised">
+      <div class="container">
+        <div class="section">
+          <div class="post_content">
+              <p>在上一篇对 <strong>zookeeper</strong> 选举实现分析之后，我们知道 <strong>zookeeper</strong> 集群在选举结束之后，<strong>leader</strong> 节点将进入 <strong>LEADING</strong> 状态，<strong>follower</strong> 节点将进入 <strong>FOLLOWING</strong> 状态；此时集群中节点将进行数据同步操作，以保证数据一致。 只有数据同步完成之后 <strong>zookeeper</strong> 集群才具备对外提供服务的能力。</p>
+<h2 id="LEADING"><a href="#LEADING" class="headerlink" title="LEADING"></a>LEADING</h2><p>当节点在选举后角色确认为 <strong>leader</strong> 后将会进入 <strong>LEADING</strong> 状态，源码如下：</p>
+<pre><code class="java">public void run() {
+    try {
+        /*
+         * Main loop
+         */
+        while (running) {
+            switch (getPeerState()) {
+            case LEADING:
+                LOG.info(&quot;LEADING&quot;);
+                try {
+                    setLeader(makeLeader(logFactory));
+                    leader.lead();
+                    setLeader(null);
+                } catch (Exception e) {
+                    LOG.warn(&quot;Unexpected exception&quot;,e);
+                } finally {
+                    if (leader != null) {
+                        leader.shutdown(&quot;Forcing shutdown&quot;);
+                        setLeader(null);
+                    }
+                    setPeerState(ServerState.LOOKING);
+                }
+                break;
+            }
+        }
+    } finally {
+
+    }
+}
+</code></pre>
+<p><strong>QuorumPeer</strong> 在节点状态变更为 <strong>LEADING</strong> 之后会创建 <strong>leader</strong> 实例，并触发 <strong>lead</strong> 过程。</p>
+<pre><code class="java">void lead() throws IOException, InterruptedException {
+    try {
+        // 省略
+
+        /**
+         * 开启线程用于接收 follower 的连接请求
+         */
+        cnxAcceptor = new LearnerCnxAcceptor();
+        cnxAcceptor.start();
+
+        readyToStart = true;
+
+        /**
+         * 阻塞等待计算新的 epoch 值，并设置 zxid
+         */
+        long epoch = getEpochToPropose(self.getId(), self.getAcceptedEpoch());          
+        zk.setZxid(ZxidUtils.makeZxid(epoch, 0));
+
+
+        /**
+         * 阻塞等待接收过半的 follower 节点发送的 ACKEPOCH 信息； 此时说明已经确定了本轮选举后 epoch 值
+         */
+        waitForEpochAck(self.getId(), leaderStateSummary);
+        self.setCurrentEpoch(epoch);
+
+        try {
+            /**
+             * 阻塞等待 超过半数的节点 follower 发送了 NEWLEADER ACK 信息；此时说明过半的 follower 节点已经完成数据同步
+             */
+            waitForNewLeaderAck(self.getId(), zk.getZxid(), LearnerType.PARTICIPANT);
+        } catch (InterruptedException e) {
+            // 省略
+        }
+
+        /**
+         * 启动 zk server，此时集群可以对外正式提供服务
+         */
+        startZkServer();
+
+        // 省略
+}
+</code></pre>
+<p>从 <strong>lead</strong> 方法的实现可得知，<strong>leader</strong> 与 <strong>follower</strong> 在数据同步过程中会执行如下过程：</p>
+<ul>
+<li>接收 follower 连接</li>
+<li>计算新的 epoch 值</li>
+<li>通知统一 epoch 值</li>
+<li>数据同步</li>
+<li>启动 zk server 对外提供服务</li>
+</ul>
+<h2 id="FOLLOWING"><a href="#FOLLOWING" class="headerlink" title="FOLLOWING"></a>FOLLOWING</h2><p>下面在看下 <strong>follower</strong> 节点进入 <strong>FOLLOWING</strong> 状态后的操作：</p>
+<pre><code class="java">public void run() {
+    try {
+        /*
+         * Main loop
+         */
+        while (running) {
+            switch (getPeerState()) {
+            case LOOKING:
+                // 省略
+            case OBSERVING:
+                // 省略
+            case FOLLOWING:
+                try {
+                    LOG.info(&quot;FOLLOWING&quot;);
+                    setFollower(makeFollower(logFactory));
+                    follower.followLeader();
+                } catch (Exception e) {
+                    LOG.warn(&quot;Unexpected exception&quot;,e);
+                } finally {
+                    follower.shutdown();
+                    setFollower(null);
+                    setPeerState(ServerState.LOOKING);
+                }
+                break;
+            }
+        }
+    } finally {
+
+    }
+}
+</code></pre>
+<p><strong>QuorumPeer</strong> 在节点状态变更为 <strong>FOLLOWING</strong> 之后会创建 <strong>follower</strong> 实例，并触发 <strong>followLeader</strong> 过程。</p>
+<pre><code class="java">void followLeader() throws InterruptedException {
+    // 省略
+    try {
+        QuorumServer leaderServer = findLeader();            
+        try {
+            /**
+             * follower 与 leader 建立连接
+             */
+            connectToLeader(leaderServer.addr, leaderServer.hostname);
+
+            /**
+             * follower 向 leader 提交节点信息用于计算新的 epoch 值
+             */
+            long newEpochZxid = registerWithLeader(Leader.FOLLOWERINFO);
+
+
+            /**
+             * follower 与 leader 数据同步
+             */
+            syncWithLeader(newEpochZxid);                
+
+             // 省略
+
+        } catch (Exception e) {
+             // 省略
+        }
+    } finally {
+        // 省略
+    }
+}
+</code></pre>
+<p>从 <strong>followLeader</strong> 方法的实现可得知，<strong>follower</strong> 与 <strong>leader</strong> 在数据同步过程中会执行如下过程：</p>
+<ul>
+<li>请求连接 leader</li>
+<li>提交节点信息计算新的 epoch 值</li>
+<li>数据同步</li>
+</ul>
+<p>下面我们看下在各个环节的实现细节；</p>
+<h3 id="Leader-Follower-建立通信"><a href="#Leader-Follower-建立通信" class="headerlink" title="Leader Follower 建立通信"></a>Leader Follower 建立通信</h3><h5 id="follower-请求连接"><a href="#follower-请求连接" class="headerlink" title="follower 请求连接"></a>follower 请求连接</h5><pre><code class="java">protected QuorumServer findLeader() {
+    QuorumServer leaderServer = null;
+    // Find the leader by id
+    Vote current = self.getCurrentVote();
+    for (QuorumServer s : self.getView().values()) {
+        if (s.id == current.getId()) {
+            // Ensure we have the leader&#39;s correct IP address before
+            // attempting to connect.
+            s.recreateSocketAddresses();
+            leaderServer = s;
+            break;
+        }
+    }
+    if (leaderServer == null) {
+        LOG.warn(&quot;Couldn&#39;t find the leader with id = &quot;
+                + current.getId());
+    }
+    return leaderServer;
+}           
+</code></pre>
+<pre><code class="java">protected void connectToLeader(InetSocketAddress addr, String hostname)
+            throws IOException, ConnectException, InterruptedException {
+    sock = new Socket();        
+    sock.setSoTimeout(self.tickTime * self.initLimit);
+    for (int tries = 0; tries &lt; 5; tries++) {
+        try {
+            sock.connect(addr, self.tickTime * self.syncLimit);
+            sock.setTcpNoDelay(nodelay);
+            break;
+        } catch (IOException e) {
+            if (tries == 4) {
+                LOG.error(&quot;Unexpected exception&quot;,e);
+                throw e;
+            } else {
+                LOG.warn(&quot;Unexpected exception, tries=&quot;+tries+
+                        &quot;, connecting to &quot; + addr,e);
+                sock = new Socket();
+                sock.setSoTimeout(self.tickTime * self.initLimit);
+            }
+        }
+        Thread.sleep(1000);
+    }
+
+    self.authLearner.authenticate(sock, hostname);
+
+    leaderIs = BinaryInputArchive.getArchive(new BufferedInputStream(
+            sock.getInputStream()));
+    bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
+    leaderOs = BinaryOutputArchive.getArchive(bufferedOutput);
+}
+</code></pre>
+<p><strong>follower</strong> 会通过选举后的投票信息确认 <strong>leader</strong> 节点地址，并发起连接（总共有 5 次尝试连接的机会，若连接不通则重新进入选举过程）</p>
+<h5 id="leader-接收连接"><a href="#leader-接收连接" class="headerlink" title="leader 接收连接"></a>leader 接收连接</h5><pre><code class="java">class LearnerCnxAcceptor extends ZooKeeperThread{
+    private volatile boolean stop = false;
+
+    public LearnerCnxAcceptor() {
+        super(&quot;LearnerCnxAcceptor-&quot; + ss.getLocalSocketAddress());
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (!stop) {
+                try{
+                    /**
+                     * 接收 follower 的连接，并开启 LearnerHandler 线程用于处理二者之间的通信
+                     */
+                    Socket s = ss.accept();
+                    s.setSoTimeout(self.tickTime * self.initLimit);
+                    s.setTcpNoDelay(nodelay);
+
+                    BufferedInputStream is = new BufferedInputStream(
+                            s.getInputStream());
+                    LearnerHandler fh = new LearnerHandler(s, is, Leader.this);
+                    fh.start();
+                } catch (SocketException e) {
+                    // 省略
+                } catch (SaslException e){
+                    LOG.error(&quot;Exception while connecting to quorum learner&quot;, e);
+                }
+            }
+        } catch (Exception e) {
+            LOG.warn(&quot;Exception while accepting follower&quot;, e);
+        }
+    }
+}
+</code></pre>
+<p>从 <strong>LearnerCnxAcceptor</strong> 实现可以看出 <strong>leader</strong> 节点在为每个 <strong>follower</strong> 节点连接建立之后都会为之分配一个 <strong>LearnerHandler</strong> 线程用于处理二者之间的通信。</p>
+<h3 id="计算新的-epoch-值"><a href="#计算新的-epoch-值" class="headerlink" title="计算新的 epoch 值"></a>计算新的 epoch 值</h3><blockquote>
+<p><strong>follower</strong> 在与 <strong>leader</strong> 建立连接之后，会发出 <strong>FOLLOWERINFO</strong> 信息</p>
+</blockquote>
+<pre><code class="java">
+long newEpochZxid = registerWithLeader(Leader.FOLLOWERINFO);
+
+</code></pre>
+<pre><code class="java">protected long registerWithLeader(int pktType) throws IOException{
+    /**
+     * 发送 follower info 信息，包括 last zxid 和 sid
+     */
+    long lastLoggedZxid = self.getLastLoggedZxid();
+    QuorumPacket qp = new QuorumPacket();                
+    qp.setType(pktType);
+    qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
+
+    /*
+     * Add sid to payload
+     */
+    LearnerInfo li = new LearnerInfo(self.getId(), 0x10000);
+    ByteArrayOutputStream bsid = new ByteArrayOutputStream();
+    BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
+    boa.writeRecord(li, &quot;LearnerInfo&quot;);
+    qp.setData(bsid.toByteArray());
+
+    /**
+     * follower 向 leader 发送 FOLLOWERINFO 信息，包括 zxid，sid，protocol version
+     */
+    writePacket(qp, true);
+
+    // 省略
+} 
+</code></pre>
+<p>接下来我们看下 <strong>leader</strong> 在接收到 <strong>FOLLOWERINFO</strong> 信息之后做什么(参考 <strong>LearnerHandler</strong>)</p>
+<pre><code class="java">public void run() {
+    try {
+        // 省略
+        /**
+         * leader 接收 follower 发送的 FOLLOWERINFO 信息，包括 follower 节点的 zxid，sid，protocol version
+         * @see Learner.registerWithleader()
+         */
+        QuorumPacket qp = new QuorumPacket();
+        ia.readRecord(qp, &quot;packet&quot;);
+
+        byte learnerInfoData[] = qp.getData();
+        if (learnerInfoData != null) {
+            if (learnerInfoData.length == 8) {
+                // 省略
+            } else {
+                /**
+                 * 高版本的 learnerInfoData 包括 long 类型的 sid, int 类型的 protocol version 占用 12 字节
+                 */
+                LearnerInfo li = new LearnerInfo();
+                ByteBufferInputStream.byteBuffer2Record(ByteBuffer.wrap(learnerInfoData), li);
+                this.sid = li.getServerid();
+                this.version = li.getProtocolVersion();
+            }
+        }
+
+        /**
+         * 通过 follower 发送的 zxid，解析出 foloower 节点的 epoch 值
+         */
+        long lastAcceptedEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
+
+        long peerLastZxid;
+        StateSummary ss = null;
+        long zxid = qp.getZxid();
+
+        /**
+         * 阻塞等待计算新的 epoch 值
+         */
+        long newEpoch = leader.getEpochToPropose(this.getSid(), lastAcceptedEpoch);
+
+        // 省略
+    }
+</code></pre>
+<p>从上述代码可知，<strong>leader</strong> 在接收到 <strong>follower</strong> 发送的 <strong>FOLLOWERINFO</strong> 信息之后，会解析出 <strong>follower</strong> 节点的 <strong>acceptedEpoch</strong> 值并参与到新的 <strong>epoch</strong> 值计算中。 （具体计算逻辑参考方法 <strong>getEpochToPropose</strong>）</p>
+<pre><code class="java">public long getEpochToPropose(long sid, long lastAcceptedEpoch) throws InterruptedException, IOException {
+    synchronized(connectingFollowers) {
+        if (!waitingForNewEpoch) {
+            return epoch;
+        }
+        // epoch 用来记录计算后的选举周期值
+        // follower 或 leader 的 acceptedEpoch 值与 epoch 比较；若前者大则将其加一
+        if (lastAcceptedEpoch &gt;= epoch) {
+            epoch = lastAcceptedEpoch+1;
+        }
+        // connectingFollowers 用来记录与 leader 已连接的 follower
+        connectingFollowers.add(sid);
+        QuorumVerifier verifier = self.getQuorumVerifier();
+        // 判断是否已计算出新的 epoch 值的条件是 leader 已经参与了 epoch 值计算，以及超过一半的节点参与了计算
+        if (connectingFollowers.contains(self.getId()) &amp;&amp; 
+                                        verifier.containsQuorum(connectingFollowers)) {
+            // 将 waitingForNewEpoch 设置为 false 说明不需要等待计算新的 epoch 值了
+            waitingForNewEpoch = false;
+            // 设置 leader 的 acceptedEpoch 值
+            self.setAcceptedEpoch(epoch);
+            // 唤醒 connectingFollowers wait 的线程
+            connectingFollowers.notifyAll();
+        } else {
+            long start = Time.currentElapsedTime();
+            long cur = start;
+            long end = start + self.getInitLimit()*self.getTickTime();
+            while(waitingForNewEpoch &amp;&amp; cur &lt; end) {
+                // 若未完成新的 epoch 值计算则阻塞等待
+                connectingFollowers.wait(end - cur);
+                cur = Time.currentElapsedTime();
+            }
+            if (waitingForNewEpoch) {
+                throw new InterruptedException(&quot;Timeout while waiting for epoch from quorum&quot;);        
+            }
+        }
+        return epoch;
+    }
+}
+</code></pre>
+<p>从方法 <strong>getEpochToPropose</strong> 可知 <strong>leader</strong> 会收集集群中过半的 <strong>follower</strong> <strong>acceptedEpoch</strong> 信息后，选出一个最大值然后加 1 就是 <strong>newEpoch</strong> 值； 在此过程中 <strong>leader</strong> 会进入阻塞状态直到过半的 <strong>follower</strong> 参与到计算才会进入下一阶段。</p>
+<h3 id="通知新的-epoch-值"><a href="#通知新的-epoch-值" class="headerlink" title="通知新的 epoch 值"></a>通知新的 epoch 值</h3><p><strong>leader</strong> 在计算出新的 <strong>newEpoch</strong> 值后，会进入下一阶段发送 <strong>LEADERINFO</strong> 信息 （同样参考 <strong>LearnerHandler</strong>）</p>
+<pre><code class="java">public void run() {
+    try {
+        // 省略
+
+        /**
+         * 阻塞等待计算新的 epoch 值
+         */
+        long newEpoch = leader.getEpochToPropose(this.getSid(), lastAcceptedEpoch);
+
+        if (this.getVersion() &lt; 0x10000) {
+            // we are going to have to extrapolate the epoch information
+            long epoch = ZxidUtils.getEpochFromZxid(zxid);
+            ss = new StateSummary(epoch, zxid);
+            // fake the message
+            leader.waitForEpochAck(this.getSid(), ss);
+        } else {
+            byte ver[] = new byte[4];
+            ByteBuffer.wrap(ver).putInt(0x10000);
+            /**
+             * 计算出新的 epoch 值后，leader 向 follower 发送 LEADERINFO 信息；包括新的 newEpoch
+             */
+            QuorumPacket newEpochPacket = new QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null);
+            oa.writeRecord(newEpochPacket, &quot;packet&quot;);
+            bufferedOutput.flush();
+
+               // 省略
+        }
+    }
+    // 省略
+}
+</code></pre>
+<pre><code class="java">protected long registerWithLeader(int pktType) throws IOException{
+    // 省略
+
+    /**
+     * follower 向 leader 发送 FOLLOWERINFO 信息，包括 zxid，sid，protocol version
+     */
+    writePacket(qp, true);
+
+    /**
+     * follower 接收 leader 发送的 LEADERINFO 信息
+     */
+    readPacket(qp);
+
+    /**
+     * 解析 leader 发送的 new epoch 值
+     */        
+    final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
+    if (qp.getType() == Leader.LEADERINFO) {
+        // we are connected to a 1.0 server so accept the new epoch and read the next packet
+        leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
+        byte epochBytes[] = new byte[4];
+        final ByteBuffer wrappedEpochBytes = ByteBuffer.wrap(epochBytes);
+
+        /**
+         * new epoch &gt; current accepted epoch 则更新 acceptedEpoch 值
+         */
+        if (newEpoch &gt; self.getAcceptedEpoch()) {
+            wrappedEpochBytes.putInt((int)self.getCurrentEpoch());
+            self.setAcceptedEpoch(newEpoch);
+        } else if (newEpoch == self.getAcceptedEpoch()) {           
+            wrappedEpochBytes.putInt(-1);
+        } else {
+            throw new IOException(&quot;Leaders epoch, &quot; + newEpoch + &quot; is less than accepted epoch, &quot; + self.getAcceptedEpoch());
+        }
+
+        /**
+         * follower 向 leader 发送 ACKEPOCH 信息，包括 last zxid
+         */
+        QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
+        writePacket(ackNewEpoch, true);
+        return ZxidUtils.makeZxid(newEpoch, 0);
+    } 
+} 
+</code></pre>
+<p>从上述代码可以看出在完成 <strong>newEpoch</strong> 值计算后的 <strong>leader</strong> 与 <strong>follower</strong> 的交互过程：</p>
+<ul>
+<li><strong>leader</strong> 向 <strong>follower</strong> 发送 <strong>LEADERINFO</strong> 信息，告知 <strong>follower</strong> 新的 <strong>epoch</strong> 值</li>
+<li><strong>follower</strong> 接收解析 <strong>LEADERINFO</strong> 信息，若 <strong>new epoch</strong> 值大于 <strong>current accepted epoch</strong> 值则更新 <strong>acceptedEpoch</strong> </li>
+<li><strong>follower</strong> 向 <strong>leader</strong> 发送 <strong>ACKEPOCH</strong> 信息，反馈 <strong>leader</strong> 已收到新的 <strong>epoch</strong> 值，并附带 <strong>follower</strong> 节点的 <strong>last zxid</strong></li>
+</ul>
+<h3 id="数据同步"><a href="#数据同步" class="headerlink" title="数据同步"></a>数据同步</h3><blockquote>
+<p>LearnerHandler 中 leader 在收到过半的 ACKEPOCH 信息之后将进入数据同步阶段</p>
+</blockquote>
+<pre><code class="java">public void run() {
+        try {
+            // 省略
+            // peerLastZxid 为 follower 的 last zxid
+            peerLastZxid = ss.getLastZxid();
+
+            /* the default to send to the follower */
+            int packetToSend = Leader.SNAP;
+            long zxidToSend = 0;
+            long leaderLastZxid = 0;
+            /** the packets that the follower needs to get updates from **/
+            long updates = peerLastZxid;
+
+            ReentrantReadWriteLock lock = leader.zk.getZKDatabase().getLogLock();
+            ReadLock rl = lock.readLock();
+            try {
+                rl.lock();        
+                final long maxCommittedLog = leader.zk.getZKDatabase().getmaxCommittedLog();
+                final long minCommittedLog = leader.zk.getZKDatabase().getminCommittedLog();
+
+                LinkedList&lt;Proposal&gt; proposals = leader.zk.getZKDatabase().getCommittedLog();
+
+                if (peerLastZxid == leader.zk.getZKDatabase().getDataTreeLastProcessedZxid()) {
+                    /**
+                     * follower 与 leader 的 zxid 相同说明 二者数据一致；同步方式为差量同步 DIFF，同步的zxid 为 peerLastZxid， 也就是不需要同步
+                     */
+                    packetToSend = Leader.DIFF;
+                    zxidToSend = peerLastZxid;
+                } else if (proposals.size() != 0) {
+                    // peerLastZxid 介于 minCommittedLog ，maxCommittedLog 中间
+                    if ((maxCommittedLog &gt;= peerLastZxid)
+                            &amp;&amp; (minCommittedLog &lt;= peerLastZxid)) {
+                        /**
+                         * 在遍历 proposals 时，用来记录上一个 proposal 的 zxid
+                         */
+                        long prevProposalZxid = minCommittedLog;
+
+                        boolean firstPacket=true;
+                        packetToSend = Leader.DIFF;
+                        zxidToSend = maxCommittedLog;
+
+                        for (Proposal propose: proposals) {
+                            // 跳过 follower 已经存在的提案
+                            if (propose.packet.getZxid() &lt;= peerLastZxid) {
+                                prevProposalZxid = propose.packet.getZxid();
+                                continue;
+                            } else {
+                                if (firstPacket) {
+                                    firstPacket = false;
+                                    if (prevProposalZxid &lt; peerLastZxid) {
+                                        /**
+                                         * 此时说明有部分 proposals 提案在 leader 节点上不存在，则需告诉 follower 丢弃这部分 proposals
+                                         * 也就是告诉 follower 先执行回滚 TRUNC ，需要回滚到 prevProposalZxid 处，也就是 follower 需要丢弃 prevProposalZxid ~ peerLastZxid 范围内的数据
+                                         * 剩余的 proposals 则通过 DIFF 进行同步
+                                         */
+                                        packetToSend = Leader.TRUNC;                                        
+                                        zxidToSend = prevProposalZxid;
+                                        updates = zxidToSend;
+                                    }
+                                }
+
+                                /**
+                                 * 将剩余待 DIFF 同步的提案放入到队列中，等待发送
+                                 */
+                                queuePacket(propose.packet);
+                                /**
+                                 * 每个提案后对应一个 COMMIT 报文
+                                 */
+                                QuorumPacket qcommit = new QuorumPacket(Leader.COMMIT, propose.packet.getZxid(),
+                                        null, null);
+                                queuePacket(qcommit);
+                            }
+                        }
+                    } else if (peerLastZxid &gt; maxCommittedLog) {                    
+                        /**
+                         * follower 的 zxid 比 leader 大 ，则告诉 follower 执行 TRUNC 回滚
+                         */
+                        packetToSend = Leader.TRUNC;
+                        zxidToSend = maxCommittedLog;
+                        updates = zxidToSend;
+                    } else {
+                    }
+                } 
+
+            } finally {
+                rl.unlock();
+            }
+
+             QuorumPacket newLeaderQP = new QuorumPacket(Leader.NEWLEADER,
+                    ZxidUtils.makeZxid(newEpoch, 0), null, null);
+             if (getVersion() &lt; 0x10000) {
+                oa.writeRecord(newLeaderQP, &quot;packet&quot;);
+            } else {
+                 // 数据同步完成之后会发送 NEWLEADER 信息
+                queuedPackets.add(newLeaderQP);
+            }
+            bufferedOutput.flush();
+            //Need to set the zxidToSend to the latest zxid
+            if (packetToSend == Leader.SNAP) {
+                zxidToSend = leader.zk.getZKDatabase().getDataTreeLastProcessedZxid();
+            }
+            /**
+             * 发送数据同步方式信息，告诉 follower 按什么方式进行数据同步
+             */
+            oa.writeRecord(new QuorumPacket(packetToSend, zxidToSend, null, null), &quot;packet&quot;);
+            bufferedOutput.flush();
+
+            /* if we are not truncating or sending a diff just send a snapshot */
+            if (packetToSend == Leader.SNAP) {
+                /**
+                 * 如果是全量同步的话，则将 leader 本地数据序列化写入 follower 的输出流
+                 */
+                leader.zk.getZKDatabase().serializeSnapshot(oa);
+                oa.writeString(&quot;BenWasHere&quot;, &quot;signature&quot;);
+            }
+            bufferedOutput.flush();
+
+            /**
+             * 开启个线程执行 packet 发送
+             */
+            sendPackets();
+
+            /**
+             * 接收 follower ack 响应
+             */
+            qp = new QuorumPacket();
+            ia.readRecord(qp, &quot;packet&quot;);
+
+            /**
+             * 阻塞等待过半的 follower ack
+             */
+            leader.waitForNewLeaderAck(getSid(), qp.getZxid(), getLearnerType());
+
+            /**
+             * leader 向 follower 发送 UPTODATE，告知其可对外提供服务
+             */
+            queuedPackets.add(new QuorumPacket(Leader.UPTODATE, -1, null, null));
+
+            // 省略
+        } 
+    }
+</code></pre>
+<p>从上述代码可以看出 <strong>leader</strong> 和 <strong>follower</strong> 在进行数据同步时会通过 <strong>peerLastZxid</strong> 与 <strong>maxCommittedLog</strong>， <strong>minCommittedLog</strong> 两个值比较最终决定数据同步方式。</p>
+<h4 id="DIFF-差异化同步"><a href="#DIFF-差异化同步" class="headerlink" title="DIFF(差异化同步)"></a>DIFF(差异化同步)</h4><ul>
+<li><strong>follower</strong> 的 <strong>peerLastZxid</strong> 等于 <strong>leader</strong> 的 <strong>peerLastZxid</strong></li>
+</ul>
+<blockquote>
+<p>此时说明 <strong>follower</strong> 与 <strong>leader</strong> 数据一致，采用 <strong>DIFF</strong> 方式同步，也即是无需同步</p>
+</blockquote>
+<ul>
+<li><strong>follower</strong> 的 <strong>peerLastZxid</strong> 介于 <strong>maxCommittedLog</strong>， <strong>minCommittedLog</strong> 两者之间</li>
+</ul>
+<blockquote>
+<p>此时说明 <strong>follower</strong> 与 <strong>leader</strong> 数据存在差异，需对差异的部分进行同步；首先 <strong>leader</strong> 会向 <strong>follower</strong> 发送 <strong>DIFF</strong> 报文告知其同步方式，随后会发送差异的提案及提案提交报文</p>
+</blockquote>
+<p>交互流程如下：</p>
+<pre><code>    Leader                 Follower
+
+      |          DIFF         |  
+      | --------------------&gt; |
+      |        PROPOSAL       |  
+      | --------------------&gt; |  
+      |         COMMIT        |  
+      | --------------------&gt; |
+      |        PROPOSAL       |  
+      | --------------------&gt; |  
+      |         COMMIT        |  
+      | --------------------&gt; |
+
+</code></pre><p>示例： 假设 <strong>leader</strong> 节点的提案缓存队列对应的 <strong>zxid</strong> 依次是：</p>
+<pre><code> 0x500000001, 0x500000002, 0x500000003, 0x500000004, 0x500000005
+</code></pre><p>而 <strong>follower</strong> 节点的 <strong>peerLastZxid</strong> 为 <strong>0x500000003</strong>，则需要将 <strong>0x500000004</strong>， <strong>0x500000005</strong> 两个提案进行同步；那么数据包发送过程如下表：</p>
+<table>
+<thead>
+<tr>
+<th>报文类型</th>
+<th>ZXID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DIFF</td>
+<td>0x500000005</td>
+</tr>
+<tr>
+<td>PROPOSAL</td>
+<td>0x500000004</td>
+</tr>
+<tr>
+<td>COMMIT</td>
+<td>0x500000004</td>
+</tr>
+<tr>
+<td>PROPOSAL</td>
+<td>0x500000005</td>
+</tr>
+<tr>
+<td>COMMIT</td>
+<td>0x500000005</td>
+</tr>
+</tbody>
+</table>
+<h4 id="TRUNC-DIFF-先回滚再差异化同步"><a href="#TRUNC-DIFF-先回滚再差异化同步" class="headerlink" title="TRUNC+DIFF(先回滚再差异化同步)"></a>TRUNC+DIFF(先回滚再差异化同步)</h4><blockquote>
+<p>在上文 <strong>DIFF</strong> 差异化同步时会存在一个特殊场景就是 虽然 <strong>follower</strong> 的 <strong>peerLastZxid</strong> 介于 <strong>maxCommittedLog</strong>， <strong>minCommittedLog</strong> 两者之间，但是 <strong>follower</strong> 的 <strong>peerLastZxid</strong> 在 <strong>leader</strong> 节点中不存在； 此时 <strong>leader</strong> 需告知 <strong>follower</strong> 先回滚到 <strong>peerLastZxid</strong> 的前一个 <strong>zxid</strong>, 回滚后再进行差异化同步。</p>
+</blockquote>
+<p>交互流程如下：</p>
+<pre><code>    Leader                 Follower
+
+      |         TRUNC         |  
+      | --------------------&gt; |
+      |        PROPOSAL       |  
+      | --------------------&gt; |  
+      |         COMMIT        |  
+      | --------------------&gt; |
+      |        PROPOSAL       |  
+      | --------------------&gt; |  
+      |         COMMIT        |  
+      | --------------------&gt; |
+
+</code></pre><p>示例： 假设集群中三台节点 A, B, C 某一时刻 A 为 Leader 选举周期为 5, zxid 包括： (0x500000004, 0x500000005, 0x500000006); 假设某一时刻 leader A 节点在处理完事务为 0x500000007 的请求进行广播时 leader A 节点服务器宕机导致 0x500000007 该事物没有被同步出去；在集群进行下一轮选举之后 B 节点成为新的 leader，选举周期为 6 对外提供服务处理了新的事务请求包括 0x600000001， 0x600000002；</p>
+<table>
+<thead>
+<tr>
+<th>集群节点</th>
+<th>ZXID 列表</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A</td>
+<td>0x500000004, 0x500000005, 0x500000006, 0x500000007</td>
+</tr>
+<tr>
+<td>B</td>
+<td>0x500000004, 0x500000005, 0x500000006, 0x600000001， 0x600000002</td>
+</tr>
+<tr>
+<td>C</td>
+<td>0x500000004, 0x500000005, 0x500000006, 0x600000001， 0x600000002</td>
+</tr>
+</tbody>
+</table>
+<p>此时节点 A 在重启加入集群后，在与 leader B 节点进行数据同步时会发现事务 0x500000007 在 leader 节点中并不存在，此时 leader 告知 A 需先回滚事务到 0x500000006，在差异同步事务 0x600000001，0x600000002；那么数据包发送过程如下表：</p>
+<table>
+<thead>
+<tr>
+<th>报文类型</th>
+<th>ZXID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TRUNC</td>
+<td>0x500000006</td>
+</tr>
+<tr>
+<td>PROPOSAL</td>
+<td>0x600000001</td>
+</tr>
+<tr>
+<td>COMMIT</td>
+<td>0x600000001</td>
+</tr>
+<tr>
+<td>PROPOSAL</td>
+<td>0x600000002</td>
+</tr>
+<tr>
+<td>COMMIT</td>
+<td>0x600000002</td>
+</tr>
+</tbody>
+</table>
+<h4 id="TRUNC-回滚同步"><a href="#TRUNC-回滚同步" class="headerlink" title="TRUNC(回滚同步)"></a>TRUNC(回滚同步)</h4><blockquote>
+<p>若 <strong>follower</strong> 的 <strong>peerLastZxid</strong> 大于 <strong>leader</strong> 的 <strong>maxCommittedLog</strong>，则告知 <strong>follower</strong> 回滚至 <strong>maxCommittedLog</strong>； 该场景可以认为是 <strong>TRUNC+DIFF</strong> 的简化模式</p>
+</blockquote>
+<p>交互流程如下：</p>
+<pre><code>    Leader                 Follower
+
+      |         TRUNC         |  
+      | --------------------&gt; |
+
+</code></pre><h4 id="SNAP-全量同步"><a href="#SNAP-全量同步" class="headerlink" title="SNAP(全量同步)"></a>SNAP(全量同步)</h4><blockquote>
+<p>若 <strong>follower</strong> 的 <strong>peerLastZxid</strong> 小于 <strong>leader</strong> 的 <strong>minCommittedLog</strong> 或者 <strong>leader</strong> 节点上不存在提案缓存队列时，将采用 <strong>SNAP</strong> 全量同步方式。 该模式下 <strong>leader</strong> 首先会向 <strong>follower</strong> 发送 <strong>SNAP</strong> 报文，随后从内存数据库中获取全量数据序列化传输给 <strong>follower</strong>， <strong>follower</strong> 在接收全量数据后会进行反序列化加载到内存数据库中。</p>
+</blockquote>
+<p>交互流程如下：</p>
+<pre><code>    Leader                 Follower
+
+      |         SNAP          |  
+      | --------------------&gt; |
+      |         DATA          |  
+      | --------------------&gt; |
+
+</code></pre><p><strong>leader</strong> 在完成数据同步之后，会向 <strong>follower</strong> 发送 <strong>NEWLEADER</strong> 报文，在收到过半的 <strong>follower</strong> 响应的 <strong>ACK</strong> 之后此时说明过半的节点完成了数据同步，接下来 <strong>leader</strong> 会向 <strong>follower</strong> 发送 <strong>UPTODATE</strong> 报文告知 <strong>follower</strong> 节点可以对外提供服务了，此时 <strong>leader</strong> 会启动 zk server 开始对外提供服务。</p>
+<h4 id="FOLLOWER-数据同步"><a href="#FOLLOWER-数据同步" class="headerlink" title="FOLLOWER 数据同步"></a>FOLLOWER 数据同步</h4><blockquote>
+<p>下面我们在看下数据同步阶段 <strong>FOLLOWER</strong> 是如何处理的，参考 <strong>Learner.syncWithLeader</strong></p>
+</blockquote>
+<pre><code class="java">protected void syncWithLeader(long newLeaderZxid) throws IOException, InterruptedException{
+        QuorumPacket ack = new QuorumPacket(Leader.ACK, 0, null, null);
+        QuorumPacket qp = new QuorumPacket();
+        long newEpoch = ZxidUtils.getEpochFromZxid(newLeaderZxid);
+
+        /**
+         * 接收 leader 发送的数据同步方式报文
+         */
+        readPacket(qp);
+
+        synchronized (zk) {
+            if (qp.getType() == Leader.DIFF) {
+
+            }
+            else if (qp.getType() == Leader.SNAP) {
+                // 执行加载全量数据
+            } else if (qp.getType() == Leader.TRUNC) {
+                // 执行回滚
+            }
+            else {
+
+            }
+
+            outerLoop:
+            while (self.isRunning()) {
+                readPacket(qp);
+                switch(qp.getType()) {
+                case Leader.PROPOSAL:
+                    // 处理提案
+                    break;
+                case Leader.COMMIT:
+                    // commit proposal
+                    break;
+                case Leader.INFORM:
+                    // 忽略
+                    break;
+                case Leader.UPTODATE:
+                    // 设置 zk server
+                    self.cnxnFactory.setZooKeeperServer(zk);
+                    // 退出循环                
+                    break outerLoop;
+                case Leader.NEWLEADER: // Getting NEWLEADER here instead of in discovery 
+                    /**
+                     * follower 响应 NEWLEADER ACK
+                     */
+                    writePacket(new QuorumPacket(Leader.ACK, newLeaderZxid, null, null), true);
+                    break;
+                }
+            }
+        }
+        ack.setZxid(ZxidUtils.makeZxid(newEpoch, 0));
+        writePacket(ack, true);
+        // 启动 zk server
+        zk.startup();
+
+    }
+</code></pre>
+<p>从上述代码中可以看出 <strong>follower</strong> 在数据同步阶段的处理流程如下：</p>
+<ul>
+<li><p><strong>follower</strong> 接收 <strong>leader</strong> 发送的数据同步方式（DIFF/TRUNC/SANP）报文并进行相应处理</p>
+</li>
+<li><p>当 <strong>follower</strong> 收到 <strong>leader</strong> 发送的 <strong>NEWLEADER</strong> 报文后，会向 <strong>leader</strong> 响应 <strong>ACK</strong> (<strong>leader</strong> 在收到过半的 <strong>ACK</strong> 消息之后会发送 <strong>UPTODATE</strong>)</p>
+</li>
+<li><p>当 <strong>follower</strong> 收到 <strong>leader</strong> 发送的 <strong>UPTODATE</strong> 报文后，说明此时可以对外提供服务，此时将启动 zk server</p>
+</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>最后用一张图总结下 zk 在完成选举后数据同步的过程如下图所示：</p>
+<p><img src="https://user-gold-cdn.xitu.io/2019/5/16/16ac09e1cd882c19?w=1348&amp;h=622&amp;f=png&amp;s=89210" alt></p>
+
+          </div>
+          <br><br>
+          <div>
+              <p>
+                       
+                      <span class="badge badge-default">#&nbsp;zookeeper</span>
+                      &nbsp;
+                      
+              </p>
+          </div>
+        </div>
+      </div>  
+    </div>
+  </div>
+  <!-- TOC -->
+  
+  <div id="toc">
+    <p class="toc-title"><i class="material-icons" style="vertical-align:middle">toc</i>Toc:</p> 
+    <div id="tocbot"></div>
+  </div>
+
+</div>
+
+
+<br>
+<!-- Comments -->
+<div class="comments" id="comments">
+
+    
+    
+<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
+<script>
+   var notify = 'false' == true ? true : false;
+   var verify = 'false' == true ? true : false;
+    window.onload = function() {
+        new Valine({
+            el: '#vcomments',
+            notify: notify,
+            verify: verify,
+            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
+            app_key: "Foweb4btd057FvDg9X3M3r83",
+            placeholder: "说点什么",
+            avatar:"retro",
+            meta: ['nick','mail','link'],
+            pageSize: "10",
+            visitor: "false"
+        });
+    };
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
+
+
+</div>
+  
+
+<footer class="footer footer-default">
+        <div class="container">
+          <div class="float-left" style="padding: 15px 0;">
+              <b>多喝热水</b>
+          </div>
+          <div class="copyright float-right">
+            &copy;
+            <script>
+              document.write(new Date().getFullYear())
+            </script>&nbsp;<a href="https://hexo.io/zh-cn/" target="_blank">HEXO</a>&nbsp;<i class="material-icons">favorite_border</i>
+            <a href="https://github.com/invom/Material-T" target="_blank">Material-T</a>
+          </div>
+        </div>
+</footer>
+      <!--   Core JS Files   -->
+      <script src="/js/core/jquery.min.js?v=3.2.1"></script>
+      <script src="/js/main.js"></script>
+      <script src="/js/core/popper.min.js"></script>
+      <script src="/js/core/bootstrap-material-design.min.js"></script>
+      <script src="/js/plugins/moment.min.js"></script>
+      <!-- Control Center for Material Kit: parallax effects, scripts for the example pages etc -->
+      <script src="/js/material-kit.min.js?v=2.0.5"></script>
+      
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tocbot/4.4.2/tocbot.min.js"></script>
+        <script src="/js/post.js"></script>
+        <script src="/js/plugins/prettify.js"></script>
+        <script>
+            $(document).ready(function(){
+                $('pre').addClass('prettyprint linenums');
+                prettyPrint();
+            })
+        </script>
+      
+</body>
+</html>
