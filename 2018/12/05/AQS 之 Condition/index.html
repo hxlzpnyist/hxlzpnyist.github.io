@@ -272,7 +272,7 @@ final boolean transferForSignal(Node node) {
 <p>signal 的作用 只是将节点从等待队列转移到同步队列中，只有当前线程释放锁后，转移到同步队列的节点才会有机会获取到锁。</p>
 </blockquote>
 <p>如下图所示为 Condition 操作节点的转移过程：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/12/14/167acc5c97a7b8a1?w=1066&amp;h=1113&amp;f=png&amp;s=82729" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d7a3617c38746.png" alt></p>
 <h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>从 Condition 的 await()、signal() 操作可以看出，其作用等效于 Object 对象的 await(), notify() 方法； </p>
 
           </div>

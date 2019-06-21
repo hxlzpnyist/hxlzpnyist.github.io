@@ -285,7 +285,7 @@ private static int ctlOf(int rs, int wc) { return rs | wc; }
 }
 </code></pre>
 <p>如下图所示为线程池创建 Worker 流程：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/12/25/167e466500acfb5c?w=692&amp;h=1221&amp;f=png&amp;s=95611" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dbef0f5248338.png" alt></p>
 <blockquote>
 <p>从 addWorker 的实现可以看出，当线程池状态为 SHUTDOWN, STOP 时，将不会在接收新的任务</p>
 </blockquote>
@@ -403,7 +403,7 @@ private static int ctlOf(int rs, int wc) { return rs | wc; }
 }
 </code></pre>
 <p>如下图所示为 worker 获取任务及执行任务的流程：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/12/25/167e51ad3aa43d27?w=977&amp;h=606&amp;f=png&amp;s=81057" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dc200b0e22150.png" alt></p>
 <p>从 getTask 的实现可以看出在以下情况下将对 worker 执行退出销毁</p>
 <ul>
 <li>线程池状态为 STOP</li>

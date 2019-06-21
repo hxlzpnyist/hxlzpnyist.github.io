@@ -471,7 +471,8 @@
     }
 </code></pre>
 <pre><code>至此将 SocketChannel 客户端通道注册到 worker group 中的 NioEventLoop　内的 selector 并监听 OP_READ 事件。
-</code></pre><p>此时 netty 内部线程模型如下：<br><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnn453ozrvj30rh09oq3n.jpg" alt></p>
+</code></pre><p>此时 netty 内部线程模型如下：</p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c810e3345031603.png" alt="Netty客户端链接派发分析-1.png"></p>
 
           </div>
           <br><br>

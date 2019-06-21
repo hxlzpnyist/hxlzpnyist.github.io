@@ -132,9 +132,9 @@ static final int SHARED_UNIT    = (1 &lt;&lt; SHARED_SHIFT);
 static final int MAX_COUNT      = (1 &lt;&lt; SHARED_SHIFT) - 1;
 static final int EXCLUSIVE_MASK = (1 &lt;&lt; SHARED_SHIFT) - 1;
 </code></pre>
-<p><img src="https://user-gold-cdn.xitu.io/2018/12/3/16773eaff78b68e6?w=1056&amp;h=414&amp;f=png&amp;s=15413" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dba4aa5563098.png" alt></p>
 <h5 id="如何获取读状态值"><a href="#如何获取读状态值" class="headerlink" title="如何获取读状态值"></a>如何获取读状态值</h5><p>获取读状态相比写状态来说就比较简单了，只需同步状态值 &gt;&gt; 右移 16 位即可</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/12/3/167740000b4b1232?w=1052&amp;h=257&amp;f=png&amp;s=14294" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dbc528e669762.png" alt></p>
 <h5 id="写状态值加一"><a href="#写状态值加一" class="headerlink" title="写状态值加一"></a>写状态值加一</h5><p>当写锁重入的时候，如何更新写状态值呢 ? 我们知道状态值的低 16 位表示写状态，那么每次写状态加一操作相当于下面二进制相加操作（逢二进一）</p>
 <pre><code class="java">0000 0000 0000 0000 | 0000 0000 0000 0011
 </code></pre>

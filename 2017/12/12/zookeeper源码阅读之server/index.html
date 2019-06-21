@@ -102,7 +102,7 @@
               <h4 id="zookeeper-server-启动流程概述"><a href="#zookeeper-server-启动流程概述" class="headerlink" title="zookeeper server 启动流程概述"></a>zookeeper server 启动流程概述</h4><blockquote>
 <p>此次只针对单机模式对 server 端的启动流程分析, 首先看下 zookeeper server 启动时序图，如下：</p>
 </blockquote>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm47wn25cj30ys0jlt9k.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7ddcef06919432.png" alt></p>
 <blockquote>
 <p>其启动流程如下：</p>
 <ul>
@@ -551,7 +551,7 @@ public void start() {
 <blockquote>
 <p>综合 AcceptThread SelectorThread IOWorkRequest 可以看出 zookeeper server 的线程模型为单线程的 Reactor模型;如下图所示:</p>
 </blockquote>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm40t5nc2j30m90axdgd.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7ddf1d29764906.png" alt></p>
 <blockquote>
 <p>后续相关的 IO 处理及　PrepRequestProcessor 相关的 Processor 流程会在下文分析</p>
 </blockquote>

@@ -172,7 +172,7 @@
 &lt;/beans&gt;
 </code></pre>
 <p>在 <code>TransactionProxyFactoryBean</code> 的属性配置中如果您对 <code>transactionAttributes</code> 属性不熟悉的话，是不是会感觉一头雾水呢？ 这个玩意怎么配置的？ 配置格式又是什么样的呢？ 配置值有哪些呢 ？； 下面将会通过对 <code>TransactionProxyFactoryBean</code> 的源码分析来一一解答。</p>
-<h3 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h3><h4 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h4><p><img src="https://user-gold-cdn.xitu.io/2019/3/7/16956a43d91cb942?w=532&amp;h=160&amp;f=png&amp;s=5861" alt="TransactionProxyFactoryBean"></p>
+<h3 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h3><h4 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h4><p><img src="https://i.loli.net/2019/06/21/5d0c7e0cebc5a77922.png" alt></p>
 <p>从 <code>TransactionProxyFactoryBean</code> 类结构我们知道，其实现了接口 <code>InitializingBean</code> 和 <code>FactoryBean</code>; 那么也就是在 <code>TransactionProxyFactoryBean</code> 实例化后会调用方法 <code>afterPropertiesSet</code>, 在获取目标对象实例时会调用方法 <code>getObject</code>; 下面将主要看下这两个方法的实现。</p>
 <h4 id="afterPropertiesSet-创建目标代理对象"><a href="#afterPropertiesSet-创建目标代理对象" class="headerlink" title="afterPropertiesSet-创建目标代理对象"></a>afterPropertiesSet-创建目标代理对象</h4><pre><code class="java">public void afterPropertiesSet() throws AopConfigException {
     // 校验 Target 目标对象
@@ -809,7 +809,7 @@ protected void doRollback(DefaultTransactionStatus status) {
 <li><code>TransactionManager</code> 执行事务挂起时会将当前事务与当前上下文解除绑定关系</li>
 <li><code>TransactionManager</code> 执行事务恢复时会将已挂起的事务重新与当前上下文绑定</li>
 </ul>
-<p><img src="https://user-gold-cdn.xitu.io/2019/3/10/1696575e80cac8ff?w=2322&amp;h=1603&amp;f=png&amp;s=308825" alt="Spring Transaction"></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7e1106fe549574.png" alt></p>
 
           </div>
           <br><br>

@@ -196,7 +196,7 @@
 }
 </code></pre>
 <p>从代码中可以看出通过 CAS 操作保证节点入队的有序安全，其入队过程中如下图所示：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/11/27/1675413481b66ce2?w=1137&amp;h=256&amp;f=png&amp;s=11932" alt="AQS节点入队过程"></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d7198e6761216.png" alt></p>
 <pre><code class="java">final boolean acquireQueued(final Node node, int arg) {
     boolean failed = true;
     try {
@@ -273,7 +273,7 @@
 <li>若前置节点非 head 节点或者获取同步状态失败，则将前置节点状态修改为 -1， 并挂起当前线程，等待被唤醒重复执行以上过程</li>
 </ul>
 <p>如下图所示：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/11/27/167543bc86ada28d?w=420&amp;h=543&amp;f=png&amp;s=17640" alt="AQS-节点自旋活动图"></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d750150f78988.png" alt></p>
 <p>接下来我们看看同步状态释放的实现。</p>
 <h4 id="release"><a href="#release" class="headerlink" title="release"></a>release</h4><blockquote>
 <p>释放同步状态</p>
@@ -327,7 +327,7 @@
 <li>唤醒后置节点上阻塞的线程</li>
 </ul>
 <p>如下图所示（红色曲线表示节点自旋过程） :</p>
-<p><img src="https://user-gold-cdn.xitu.io/2018/11/27/167544ef85661bdf?w=645&amp;h=652&amp;f=png&amp;s=29604" alt="AQS-释放锁"></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d774e37b54306.png" alt></p>
 <h4 id="acquireInterruptibly"><a href="#acquireInterruptibly" class="headerlink" title="acquireInterruptibly()"></a>acquireInterruptibly()</h4><blockquote>
 <p>独占模式下获取同步状态，不同于 acquire 方法，该方法对中断操作敏感； 也就是说当前线程在获取同步状态的过程中，若被中断则会抛出中断异常</p>
 </blockquote>

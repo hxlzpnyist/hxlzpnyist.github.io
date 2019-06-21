@@ -100,7 +100,7 @@
         <div class="section">
           <div class="post_content">
               <h4 id="zookeeper-client-启动流程"><a href="#zookeeper-client-启动流程" class="headerlink" title="zookeeper client 启动流程"></a>zookeeper client 启动流程</h4><blockquote>
-<p>先看下 zookeeper client 相关类图<br><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm4gu34pbj30vp0g1t9p.jpg" alt></p>
+<p>先看下 zookeeper client 相关类图<br><img src="https://i.loli.net/2019/06/21/5d0c7dce48fc932501.png" alt></p>
 </blockquote>
 <h5 id="执行-zkCli-sh-脚本时-会运行-org-apache-zookeeper-ZookeeperMain-类主方法"><a href="#执行-zkCli-sh-脚本时-会运行-org-apache-zookeeper-ZookeeperMain-类主方法" class="headerlink" title="执行 zkCli.sh 脚本时, 会运行 org.apache.zookeeper.ZookeeperMain 类主方法."></a>执行 zkCli.sh 脚本时, 会运行 org.apache.zookeeper.ZookeeperMain 类主方法.</h5><pre><code class="java">public static void main(String args[])
         throws KeeperException, IOException, InterruptedException
@@ -350,7 +350,7 @@ public void start() {
 <h6 id="客户端连接创建流程"><a href="#客户端连接创建流程" class="headerlink" title="客户端连接创建流程"></a>客户端连接创建流程</h6><blockquote>
 <p>先大概看下此流程活动图　如下:</p>
 </blockquote>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm4i5lp6zj30yg0oa77g.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dd21a15341180.png" alt></p>
 <blockquote>
 <ul>
 <li>sendThread 轮询过程中　先判断 clientCnxnSocket 是否已连接；若未连接则调用 sendThread.startConnect() 将 ClientCnxn.state 的状态改为 “连接中”, 接下来同步调用 clientCnxnSocket.connect 完成客户端 socket 的创建及注册到 selector 并监听连接事件</li>
@@ -363,7 +363,7 @@ public void start() {
 <h6 id="客户端心跳流程"><a href="#客户端心跳流程" class="headerlink" title="客户端心跳流程"></a>客户端心跳流程</h6><blockquote>
 <p>心跳流程如下：</p>
 </blockquote>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm4jaf9ooj30ro0l640z.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dd6106a397271.png" alt></p>
 <blockquote>
 <ul>
 <li>sendThread 轮询过程中　判断 state 是否为 “已连接”; 若已连接判断是否满足心跳条件, 调用 sendPing 创建心跳 packet　header xid = -2; 接下来将 packet　添加到 outgoingQueue　队列中并调用 clientCnxnSocket.packetAddedd　最后唤醒阻塞在 selector.select 上的操作</li>
@@ -374,7 +374,7 @@ public void start() {
 <h6 id="客户端终端发送指令流程"><a href="#客户端终端发送指令流程" class="headerlink" title="客户端终端发送指令流程"></a>客户端终端发送指令流程</h6><blockquote>
 <p>发送指令流程图如下:</p>
 </blockquote>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fmm4k6ka0bj30ts0h8gn8.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7ddaac2f166051.png" alt></p>
 <blockquote>
 <ul>
 <li>ZookeeperMain 构建完成后会调用 run　方法，等待用户输入</li>

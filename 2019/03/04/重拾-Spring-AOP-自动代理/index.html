@@ -151,7 +151,7 @@ do after return advice ....
 do before advice ....
 do demo.
 do after return advice ....
-</code></pre><h3 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://user-gold-cdn.xitu.io/2019/3/4/16947a2225df2140?w=732&amp;h=245&amp;f=png&amp;s=9139" alt="BeanNameAutoProxyCreator"></p>
+</code></pre><h3 id="实现分析"><a href="#实现分析" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构"><a href="#类结构" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://i.loli.net/2019/06/21/5d0c7e016fccc50312.png" alt></p>
 <p>如上图 <code>BeanNameAutoProxyCreator</code> 类结构可以看出，其实现了接口 <code>BeanPostProcessor</code> ; 那么我们可以大概猜测出其自动代理的实现原理与自动注入类似，都是在 bean 实例化后进行特殊的处理，下面就让我们看下源码验证下吧。</p>
 <h5 id="分析"><a href="#分析" class="headerlink" title="分析"></a>分析</h5><pre><code class="java">public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
     // Check for special cases. We don&#39;t want to try to autoproxy a part of the autoproxying
@@ -381,7 +381,7 @@ do after return advice ....
 </code></pre><blockquote>
 <p>从测试结果可以看出，通过配置不同 <code>Advisor</code> 匹配不同的 <code>Method</code> 采用相应的 <code>Advice</code> 进行处理。</p>
 </blockquote>
-<h3 id="实现分析-1"><a href="#实现分析-1" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构-1"><a href="#类结构-1" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://user-gold-cdn.xitu.io/2019/3/4/16949161074e79f6?w=732&amp;h=330&amp;f=png&amp;s=12834" alt="DefaultAdvisorAutoProxyCreator"></p>
+<h3 id="实现分析-1"><a href="#实现分析-1" class="headerlink" title="实现分析"></a>实现分析</h3><h5 id="类结构-1"><a href="#类结构-1" class="headerlink" title="类结构"></a>类结构</h5><p><img src="https://i.loli.net/2019/06/21/5d0c7e0357abb57342.png" alt></p>
 <p>从上图 <code>DefaultAdvisorAutoProxyCreator</code> 类结构，我们知道其实现与 <code>BeanNameAutoProxyCreator</code> 类似；都是通过实现接口 <code>BeanPostProcessor</code> 在 bean 完成实例化后进行自动代理处理。</p>
 <h5 id="分析-1"><a href="#分析-1" class="headerlink" title="分析"></a>分析</h5><p>因 <code>DefaultAdvisorAutoProxyCreator</code> 和 <code>BeanNameAutoProxyCreator</code> 都继承了类 <code>AbstractAutoProxyCreator</code> ,所以从源码中我们可以发现二者都重写了方法 <code>getInterceptorsAndAdvisorsForBean</code> ，也就是在获取当前 bean 所匹配的 <code>Advisor</code> 逻辑不一样之外其他处理一致； 那么下面针对 <code>DefaultAdvisorAutoProxyCreator</code> 的实现我们主要看下方法 <code>getInterceptorsAndAdvisorsForBean</code> 的处理。</p>
 <pre><code class="java">protected Object[] getInterceptorsAndAdvisorsForBean(Object bean, String name) {

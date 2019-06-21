@@ -971,7 +971,7 @@ public boolean connectedToPeer(long peerSid) {
 <blockquote>
 <p>到此我们基本明白了 <strong>ZK</strong> 集群节点发送和接收投票的处理流程，但是这个时候您是不是又有一种懵的状态呢 笑哭，我们会发现选举过程中依赖了多个线程 <strong>WorkerSender</strong>, <strong>SendWorker</strong>, <strong>WorkerReceiver</strong>, <strong>RecvWorker</strong> ，多个阻塞队列 <strong>sendqueue</strong>, <strong>recvqueue</strong>,<strong>queueSendMap</strong>,<strong>recvQueue</strong> 而且名字起的很类似，更让人懵 ； 不过莫慌，我们来通过下面的图来缕下思路</p>
 </blockquote>
-<p><img src="https://user-gold-cdn.xitu.io/2019/4/26/16a587c8a75bb69c?w=1622&amp;h=941&amp;f=png&amp;s=125205" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dcbe312329084.png" alt></p>
 <h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>看了这么长时间的代码，也够累的；最后我们就来个小结吧 ：</p>
 <ul>
 <li><p>QuorumCnxManager 类主要职能是负责集群中节点与外部节点进行通信及投票信息的中转</p>

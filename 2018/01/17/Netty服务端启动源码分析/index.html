@@ -264,7 +264,7 @@ try {
 <p>从 NioEventLoop 的构造方法可以看出,　其内部包含了一个 thread 以及 taskQueue 并且绑定了一个 selector; taskQueue 用于存储内部执行的任务, thread 该线程主要用来执行 taskQueue 中的任务及处理客户端链接的请求。</p>
 <pre><code>此时完成了 selector 选择器的创建,并将其绑定到 NioEventLoop 实例
 </code></pre><p>在完成了两个 NioEventLoopGroup 实例的创建之后　我们可以看出 Netty 内部线程模型大概如下：</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnju1tz4auj30k106h3yg.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c814c1502a84087.png" alt="Netty服务端启动源码分析-1.png"></p>
 <h5 id="NioServerSocketChannel-通道创建"><a href="#NioServerSocketChannel-通道创建" class="headerlink" title="NioServerSocketChannel 通道创建"></a>NioServerSocketChannel 通道创建</h5><p>ServerBootstrap 在完成 group, channel, handler 的配置之后调用 bind 完成服务端启动，让我们看下其实现:</p>
 <pre><code class="java">     public ChannelFuture bind(int inetPort) {
         return bind(new InetSocketAddress(inetPort));

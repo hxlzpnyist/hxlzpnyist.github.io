@@ -253,9 +253,11 @@
 <li>返回头部元素并释放锁</li>
 </ul>
 <p>此时我们可以看出 ArrayBlockingQueue 中通过两个指针 takeIndex putIndex 的移动来保证队列的 FIFO,如下图所示：</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnrtuixm5vj30yb09laa5.jpg" alt></p>
-<pre><code>我们知道数组有界　在队列中又是如何保证循环利用的呢？
-</code></pre><pre><code class="java">    final int inc(int i) {
+<p><img src="https://i.loli.net/2019/06/21/5d0c80bfa72f661446.png" alt="jdk之ArrayBlockingQueue-1.png"></p>
+<blockquote>
+<p>   我们知道数组有界　在队列中又是如何保证循环利用的呢？</p>
+</blockquote>
+<pre><code class="java">    final int inc(int i) {
         return (++i == items.length) ? 0 : i;
     }
 </code></pre>

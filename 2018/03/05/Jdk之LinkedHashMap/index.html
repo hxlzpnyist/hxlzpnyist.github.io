@@ -100,7 +100,7 @@
         <div class="section">
           <div class="post_content">
               <h5 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h5><p>LinkedHashMap 与 HashMap 的不同之处在于前者遍历有序，后者遍历无序</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fp29qrz3k1j30900f0mxz.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d976cc6977729.png" alt></p>
 <p>从上图中可以看出 LinkedHashMap 继承至 HashMap , 并重写了 init, createEntry, addEntry, iterator 等方法。</p>
 <p>同时新增了全局变量 header, 并自定义了 LinkedHashMap.Entry 内部类<br><a id="more"></a></p>
 <pre><code class="java">private static class Entry&lt;K,V&gt; extends HashMap.Entry&lt;K,V&gt; {
@@ -165,7 +165,7 @@
         }
 </code></pre>
 <p>从init, Entry.addBefore 方法可以看出 LinkedHashMap 内部维护了一个”双向链表”，每次添加元素的时候会将该节点添加到链表中；如下图所示：</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fp2baen2gdj30ul0h7qv5.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d9f1561214315.png" alt></p>
 <h6 id="iterator"><a href="#iterator" class="headerlink" title="iterator"></a>iterator</h6><pre><code class="java">private abstract class LinkedHashIterator&lt;T&gt; implements Iterator&lt;T&gt; {
         Entry&lt;K,V&gt; nextEntry    = header.after;
         Entry&lt;K,V&gt; lastReturned = null;

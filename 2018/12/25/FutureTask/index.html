@@ -305,8 +305,8 @@
 <li>若需要超时等待，则将调用者线程按指定时间挂起，反之将调用者线程挂起等待任务完成唤醒</li>
 <li>state &gt; COMPLETING 任务完成退出循环</li>
 </ul>
-<p>结合上述分析可得 FutureTask 执行活动图如下：<br><img src="https://user-gold-cdn.xitu.io/2018/11/8/166f31870162c2ff?w=739&amp;h=488&amp;f=png&amp;s=26103" alt></p>
-<p>同时也可以看出，在 FutureTask 中内部维护了一个单向链表 waiters , 在执行 get 的时候会向其中添加节点:<br><img src="https://user-gold-cdn.xitu.io/2018/11/8/166f3272f092cf9c?w=617&amp;h=412&amp;f=png&amp;s=14063" alt></p>
+<p>结合上述分析可得 FutureTask 执行活动图如下：<br><img src="https://i.loli.net/2019/06/21/5d0c7d82db64d74902.png" alt></p>
+<p>同时也可以看出，在 FutureTask 中内部维护了一个单向链表 waiters , 在执行 get 的时候会向其中添加节点:<br><img src="https://i.loli.net/2019/06/21/5d0c7d84e2e0842204.png" alt></p>
 <h4 id="任务取消-cancel"><a href="#任务取消-cancel" class="headerlink" title="任务取消 - cancel()"></a>任务取消 - cancel()</h4><pre><code class="java">    /**
      * mayInterruptIfRunning 是否中断执行线程
      */

@@ -105,19 +105,19 @@
 <pre><code>只要二叉树上有一个节点的平衡因子的绝对值大于１, 那么该二叉树就是不平衡的
 </code></pre><h6 id="最小不平衡子树"><a href="#最小不平衡子树" class="headerlink" title="最小不平衡子树"></a>最小不平衡子树</h6><p>最小不平衡子树: 当我们在执行平衡二叉树插入节点时，距离插入节点最近的，且平衡因子的绝对值大于１的节点为根的子树，我们将其称之为最小不平衡子树。</p>
 <h6 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h6><p>现通过下图一些样例说明何为平衡二叉树</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fou295n9p2j30fw08s3zu.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c819e5bf6196713.png" alt="数据结构-平衡二叉树-1.png"></p>
 <ul>
 <li>图１为平衡二叉树：因为除了根节点的平衡因子为０，其他节点的平衡因子的绝对值均为１，符合平衡二叉树的条件</li>
 <li>图２不是平衡二叉树：因为节点５８的左节点为５９，５９ &gt; 58 不符合二叉树的性质左节点小于根节点，所以也不符合平衡二叉树</li>
 <li>图３不是平衡二叉树：因为节点５８的左子树的深度为２，而右子树为空；平衡因子为２，所以不符合平衡二叉树的条件</li>
 <li>图４为平衡二叉树，满足平衡二叉树的条件</li>
 </ul>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fou58qvs1fj308i04x0t5.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7deb754b362557.png" alt></p>
 <p>同样如上图所示，插入节点３７时，距离它最近的且平衡因子超过１的节点为５８，所以５８节点开始以下的子树为最小不平衡子树。</p>
 <h5 id="实现原理"><a href="#实现原理" class="headerlink" title="实现原理"></a>实现原理</h5><p>平衡二叉树构建的基本思想就是在构建二叉排序树的过程中，每当插入一个节点时先检查是否因插入而破坏了树的平衡性；若是则找出最小不平衡子树，在保持二叉排序树特性的前提下调整最小不平衡子树中各节点之间的链接关系进行相应的旋转，使其成为新的平衡子树。</p>
 <p>下面以一个数组 a[10] = {3, 2, 1, 4, 5, 6, 7, 10, 9, 8} 构建平衡二叉树的过程来说明其实现原理。</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fow3wpwca3j310z0nwe81.jpg" alt></p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fow3xwecl3j30zx0qqkjl.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7df376f1545117.png" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7dfb195a685186.png" alt></p>
 <p>以上两张图说明了平衡二叉树在构建过程的原理。针对构建过程发现不平衡的处理有如下几个步骤：</p>
 <ul>
 <li>当最小不平衡子树根节点的平衡因子BF大于１时，右旋；当平衡因子小于-1时左旋</li>

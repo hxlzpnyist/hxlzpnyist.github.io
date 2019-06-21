@@ -250,7 +250,7 @@
     }
 </code></pre>
 <p>此时我们可以看出 LinkedBlockingQueue 中通过移动节点 head last 指针来实现队列的 FIFO; 效果如下图所示：</p>
-<p><img src="https://ws1.sinaimg.cn/large/005YB8EKly1fnu4l95bqij30xy0bft91.jpg" alt></p>
+<p><img src="https://i.loli.net/2019/06/21/5d0c7d9421b3689118.png" alt></p>
 <pre><code>因为插入和获取头部操作里采用的是两个不同的锁，所以为了保持不同线程不同操作内队列元素个数的一致性所以采用 AtomicInteger 计算而非 int 类型。
 </code></pre><h6 id="put-E-e"><a href="#put-E-e" class="headerlink" title="put(E e)"></a>put(E e)</h6><pre><code class="java">public void put(E e) throws InterruptedException {
         if (e == null) throw new NullPointerException();
