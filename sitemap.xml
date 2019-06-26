@@ -2,6 +2,202 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/04/AbstractQueuedSynchronizer%20%E9%98%9F%E5%88%97%E5%90%8C%E6%AD%A5%E5%99%A8%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-%E5%85%B1%E4%BA%AB%E9%94%81/</loc>
+    
+    <lastmod>2019-06-26T06:35:30.864Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/02/AbstractQueuedSynchronizer-%E9%98%9F%E5%88%97%E5%90%8C%E6%AD%A5%E5%99%A8%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:35:26.333Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/05/AQS%20%E4%B9%8B%20Condition/</loc>
+    
+    <lastmod>2019-06-26T06:35:19.594Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/07/CountDownLatch%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:35:15.220Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/09/CyclicBarrier-%E5%90%8C%E6%AD%A5%E5%B1%8F%E9%9A%9C%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:35:11.545Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/22/DelayQueue%20%E5%BB%B6%E8%BF%9F%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97%E4%BD%BF%E7%94%A8%E5%8F%8A%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:35:07.451Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/25/FutureTask/</loc>
+    
+    <lastmod>2019-06-26T06:34:50.406Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/02/24/LeetCode-%E6%95%B0%E7%BB%84-%E4%B8%89%E6%95%B0%E4%B9%8B%E5%92%8C/</loc>
+    
+    <lastmod>2019-06-26T06:34:26.385Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/01/LeetCode-%E6%95%B0%E7%BB%84-%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0/</loc>
+    
+    <lastmod>2019-06-26T06:34:17.336Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/02/26/LeetCode-%E6%95%B0%E7%BB%84-%E5%88%A0%E9%99%A4%E6%9C%89%E5%BA%8F%E6%95%B0%E7%BB%84%E9%87%8D%E5%A4%8D%E5%85%83%E7%B4%A0/</loc>
+    
+    <lastmod>2019-06-26T06:34:10.047Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2017/12/21/NIO-selector%E7%9A%84wakeup/</loc>
+    
+    <lastmod>2019-06-26T06:34:00.016Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2017/12/13/NIO%E4%B9%8BByteBuffer/</loc>
+    
+    <lastmod>2019-06-26T06:33:53.102Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2017/12/14/NIO%E4%B9%8B%E7%B2%98%E5%8C%85%E6%8B%86%E5%8C%85%E5%A4%84%E7%90%86/</loc>
+    
+    <lastmod>2019-06-26T06:33:48.013Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/11/ReentrantLock-%E9%87%8D%E5%85%A5%E9%94%81%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:33:21.986Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/13/ReentrantReadWriteLock-%E8%AF%BB%E5%86%99%E9%94%81/</loc>
+    
+    <lastmod>2019-06-26T06:33:17.114Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/15/Semaphore-%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:33:12.395Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2018/12/20/ThreadPoolExecutor-%E7%BA%BF%E7%A8%8B%E6%B1%A0%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:33:05.699Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/05/%E9%87%8D%E6%8B%BE-Spring-Transaction/</loc>
+    
+    <lastmod>2019-06-26T06:32:49.272Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/02/27/%E9%87%8D%E6%8B%BE-Spring-IOC/</loc>
+    
+    <lastmod>2019-06-26T06:32:44.640Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/02/%E9%87%8D%E6%8B%BE-Spring-AOP/</loc>
+    
+    <lastmod>2019-06-26T06:32:39.728Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/04/%E9%87%8D%E6%8B%BE-Spring-AOP-%E8%87%AA%E5%8A%A8%E4%BB%A3%E7%90%86/</loc>
+    
+    <lastmod>2019-06-26T06:32:35.110Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/14/%E9%87%8D%E6%8B%BE-Mybatis-%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E8%A7%A3%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:32:29.766Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/03/15/%E9%87%8D%E6%8B%BE-Mybatis-Mapper%E6%96%87%E4%BB%B6%E8%A7%A3%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:32:21.524Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2017/12/12/zookeeper%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E4%B9%8Bserver/</loc>
+    
+    <lastmod>2019-06-26T06:31:52.163Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2017/12/15/zookeeper%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E4%B9%8Bclient/</loc>
+    
+    <lastmod>2019-06-26T06:31:45.338Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/04/20/zookeeper-%E9%80%89%E4%B8%BE%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:31:34.923Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/05/09/zookeeper-%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-26T06:30:31.564Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://www.hxlzpnyist.site/2019/06/25/zookeeper-%E6%95%B0%E6%8D%AE%E5%88%9D%E5%A7%8B%E5%8C%96%E5%88%86%E6%9E%90/</loc>
+    
+    <lastmod>2019-06-25T10:17:21.285Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://www.hxlzpnyist.site/2018/02/26/%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84-%E5%B9%B3%E8%A1%A1%E4%BA%8C%E5%8F%89%E6%A0%91/</loc>
     
     <lastmod>2019-06-21T07:05:20.573Z</lastmod>
@@ -30,41 +226,6 @@
   </url>
   
   <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/05/%E9%87%8D%E6%8B%BE-Spring-Transaction/</loc>
-    
-    <lastmod>2019-06-21T06:49:53.142Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/02/27/%E9%87%8D%E6%8B%BE-Spring-IOC/</loc>
-    
-    <lastmod>2019-06-21T06:49:47.133Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/02/%E9%87%8D%E6%8B%BE-Spring-AOP/</loc>
-    
-    <lastmod>2019-06-21T06:49:41.492Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/04/%E9%87%8D%E6%8B%BE-Spring-AOP-%E8%87%AA%E5%8A%A8%E4%BB%A3%E7%90%86/</loc>
-    
-    <lastmod>2019-06-21T06:49:39.458Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/14/%E9%87%8D%E6%8B%BE-Mybatis-%E9%85%8D%E7%BD%AE%E6%96%87%E4%BB%B6%E8%A7%A3%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:49:34.596Z</lastmod>
-    
-  </url>
-  
-  <url>
     <loc>https://www.hxlzpnyist.site/2019/04/14/%E5%A3%B0%E7%BD%91sdk%E4%BD%93%E9%AA%8C-%E7%9B%B4%E6%92%AD/</loc>
     
     <lastmod>2019-06-21T06:49:10.278Z</lastmod>
@@ -79,86 +240,9 @@
   </url>
   
   <url>
-    <loc>https://www.hxlzpnyist.site/2017/12/12/zookeeper%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E4%B9%8Bserver/</loc>
-    
-    <lastmod>2019-06-21T06:49:03.284Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2017/12/15/zookeeper%E6%BA%90%E7%A0%81%E9%98%85%E8%AF%BB%E4%B9%8Bclient/</loc>
-    
-    <lastmod>2019-06-21T06:48:58.822Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/04/20/zookeeper-%E9%80%89%E4%B8%BE%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:48:44.040Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/05/09/zookeeper-%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:48:41.001Z</lastmod>
-    
-  </url>
-  
-  <url>
     <loc>https://www.hxlzpnyist.site/2017/12/12/vim%E7%BC%96%E5%86%99markdown%E5%AE%9E%E6%97%B6%E9%A2%84%E8%A7%88/</loc>
     
     <lastmod>2019-06-21T06:48:38.206Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/20/ThreadPoolExecutor-%E7%BA%BF%E7%A8%8B%E6%B1%A0%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:48:34.091Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/13/ReentrantReadWriteLock-%E8%AF%BB%E5%86%99%E9%94%81/</loc>
-    
-    <lastmod>2019-06-21T06:48:28.441Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/11/ReentrantLock-%E9%87%8D%E5%85%A5%E9%94%81%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:48:24.404Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2017/12/13/NIO%E4%B9%8BByteBuffer/</loc>
-    
-    <lastmod>2019-06-21T06:48:22.153Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/02/26/LeetCode-%E6%95%B0%E7%BB%84-%E5%88%A0%E9%99%A4%E6%9C%89%E5%BA%8F%E6%95%B0%E7%BB%84%E9%87%8D%E5%A4%8D%E5%85%83%E7%B4%A0/</loc>
-    
-    <lastmod>2019-06-21T06:48:07.219Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/01/LeetCode-%E6%95%B0%E7%BB%84-%E5%88%A0%E9%99%A4%E5%85%83%E7%B4%A0/</loc>
-    
-    <lastmod>2019-06-21T06:48:04.729Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/02/24/LeetCode-%E6%95%B0%E7%BB%84-%E4%B8%89%E6%95%B0%E4%B9%8B%E5%92%8C/</loc>
-    
-    <lastmod>2019-06-21T06:48:02.054Z</lastmod>
     
   </url>
   
@@ -191,55 +275,6 @@
   </url>
   
   <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/25/FutureTask/</loc>
-    
-    <lastmod>2019-06-21T06:47:33.325Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/22/DelayQueue%20%E5%BB%B6%E8%BF%9F%E9%98%BB%E5%A1%9E%E9%98%9F%E5%88%97%E4%BD%BF%E7%94%A8%E5%8F%8A%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:47:28.427Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/09/CyclicBarrier-%E5%90%8C%E6%AD%A5%E5%B1%8F%E9%9A%9C%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:47:25.825Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/05/AQS%20%E4%B9%8B%20Condition/</loc>
-    
-    <lastmod>2019-06-21T06:47:22.316Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/02/AbstractQueuedSynchronizer-%E9%98%9F%E5%88%97%E5%90%8C%E6%AD%A5%E5%99%A8%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-06-21T06:47:19.463Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/04/AbstractQueuedSynchronizer%20%E9%98%9F%E5%88%97%E5%90%8C%E6%AD%A5%E5%99%A8%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-%E5%85%B1%E4%BA%AB%E9%94%81/</loc>
-    
-    <lastmod>2019-06-21T06:47:09.018Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2019/03/15/%E9%87%8D%E6%8B%BE-Mybatis-Mapper%E6%96%87%E4%BB%B6%E8%A7%A3%E6%9E%90/</loc>
-    
-    <lastmod>2019-03-15T07:14:59.488Z</lastmod>
-    
-  </url>
-  
-  <url>
     <loc>https://www.hxlzpnyist.site/about/index.html</loc>
     
     <lastmod>2019-02-22T09:49:55.730Z</lastmod>
@@ -268,37 +303,9 @@
   </url>
   
   <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/15/Semaphore-%E7%9A%84%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-02-22T08:40:26.491Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2018/12/07/CountDownLatch%E5%AE%9E%E7%8E%B0%E5%88%86%E6%9E%90/</loc>
-    
-    <lastmod>2019-02-22T08:38:46.202Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2017/12/14/NIO%E4%B9%8B%E7%B2%98%E5%8C%85%E6%8B%86%E5%8C%85%E5%A4%84%E7%90%86/</loc>
-    
-    <lastmod>2018-05-30T06:37:41.000Z</lastmod>
-    
-  </url>
-  
-  <url>
     <loc>https://www.hxlzpnyist.site/2018/01/24/jdk%E4%B9%8BBlockingQueue/</loc>
     
     <lastmod>2018-01-24T06:08:37.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://www.hxlzpnyist.site/2017/12/21/NIO-selector%E7%9A%84wakeup/</loc>
-    
-    <lastmod>2017-12-21T07:37:20.000Z</lastmod>
     
   </url>
   
