@@ -401,258 +401,6 @@
 
 
   
-    <article id="post-声网sdk体验-直播" class="article article-type-post  article-index" itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2019/04/14/声网sdk体验-直播/">声网sdk体验-直播</a>
-    </h1>
-  
-
-        
-        <a href="/2019/04/14/声网sdk体验-直播/" class="archive-article-date">
-  	<time datetime="2019-04-14T05:46:47.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2019-04-14</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>直播如何实现的？</p>
-<p>下面是基于声网 sdk 快速开发简单直播demo的实现。</p>
-<h2 id="功能设计"><a href="#功能设计" class="headerlink" title="功能设计"></a>功能设计</h2><p><img src="https://i.loli.net/2019/06/21/5d0c7de38e26d54660.png" alt></p>
-<p>如上图所示为直播 Demo 实现的基本功能展示，包括：</p>
-<blockquote>
-<p>主播端：</p>
-</blockquote>
-<ul>
-<li>创建直播间</li>
-<li>发布、取消发布视频</li>
-<li>下播</li>
-<li>浏览发送弹幕</li>
-</ul>
-<blockquote>
-<p>访客端：</p>
-</blockquote>
-<ul>
-<li>浏览直播间</li>
-<li>观看直播</li>
-<li>退出直播间</li>
-<li>浏览发送弹幕</li>
-</ul>
-<p>下面看下本次实现的简易架构图：</p>
-<p><img src="https://user-gold-cdn.xitu.io/2019/4/14/16a1bcd4633877f5?w=499&amp;h=325&amp;f=png&amp;s=14223" alt="直播架构"></p>
-<h2 id="实现"><a href="#实现" class="headerlink" title="实现"></a>实现</h2><p>在实现之前我们需要创建 Agora 账号并获取 App ID（参见声网的开发者中心）。</p>
-<h3 id="主播端"><a href="#主播端" class="headerlink" title="主播端"></a>主播端</h3><h5 id="创建直播间"><a href="#创建直播间" class="headerlink" title="创建直播间"></a>创建直播间</h5><blockquote>
-<p>本次实现对于直播间的创建只是简单记录下直播间的名称</p>
-</blockquote>
-<h6 id="存储直播间名称"><a href="#存储直播间名称" class="headerlink" title="存储直播间名称"></a>存储直播间名称</h6><pre><code class="java">protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // 获取直播间名称
-        String room = req.getParameter(&quot;room&quot;);
-        // 新增直播间
-        RoomListHolder.addRoom(room);
-
-        resp.setCharacterEncoding(&quot;UTF-8&quot;);
-        resp.setContentType(&quot;application/json&quot;);
-
-        resp.getWriter().write(&quot;true&quot;);
-    }
-</code></pre>
-<h6 id="Agora-SDK-集成"><a href="#Agora-SDK-集成" class="headerlink" title="Agora SDK 集成"></a>Agora SDK 集成</h6><pre><code class="javascript">    // 创建 Agora Client
-    var client = AgoraRTC.createClient({mode: &#39;interop&#39;});
-    // 初始化 client，并在初始化成功后执行加入直播间频道
-    client.init(&#39;APP ID&#39;, function () {
-        // 加入直播间频道
-        client.join(null, room, null, function (uid) {
-            console.log(&quot;用户 &quot; + uid + &quot;创建了直播间 &quot; + room);
-
-            // 执行本地视频发布
-        });
-    });
-</code></pre>
-<h5 id="发布视频"><a href="#发布视频" class="headerlink" title="发布视频"></a>发布视频</h5><blockquote>
-<p>主播在完成直播间的创建之后，基于 Agora SDK 实现本地视频的发布，这样当有订阅该直播间频道的用户将会获取视频流。</p>
-</blockquote>
-<h6 id="获取本地音频设备"><a href="#获取本地音频设备" class="headerlink" title="获取本地音频设备"></a>获取本地音频设备</h6><p>在发布视频前，需要获取本地的音频设备，也即是麦克风，摄像头。</p>
-<pre><code class="javascript">AgoraRTC.getDevices(function (devices) {
-    for (var i = 0; i !== devices.length; ++i) {
-        var device = devices[i];
-
-        if (device.kind === &#39;audioinput&#39;) {
-            // 获取麦克风设备
-            media.audio = device.deviceId;
-        } else if (device.kind === &#39;videoinput&#39;) {
-            // 获取摄像头设备
-            media.video = device.deviceId;
-        }
-    }
-});
-</code></pre>
-<h6 id="发布视频-1"><a href="#发布视频-1" class="headerlink" title="发布视频"></a>发布视频</h6><pre><code class="javascript">    // 创建本地音视频流
-    var localStream = AgoraRTC.createStream({
-        streamID: uid, // Agora 分配的 uid
-        audio: true,
-        cameraId: camera, 
-        microphoneId: microphone,
-        video: true,
-        screen: false
-    });
-    // 初始化音视频流
-    localStream.init(function () {
-        // 指定元素 ID 播放音视频流
-        localStream.play(&#39;video&#39;);
-
-        // 发布音视频流
-        client.publish(localStream, function (err) {
-            console.log(&quot;音视频发布失败: &quot; + err);
-        });
-        // 监听音视频发布事件
-        client.on(&#39;stream-published&#39;, function (evt) {
-            console.log(&quot;音视频发布成功!&quot;);
-        });
-    }, function (err) {
-        console.log(&quot;&quot;, err);
-    });
-</code></pre>
-<h5 id="下播"><a href="#下播" class="headerlink" title="下播"></a>下播</h5><blockquote>
-<p>下播对于 Agora SDK 来说即是离开频道，同时从直播间列表中移除当前直播间。</p>
-</blockquote>
-<pre><code class="javascript">client.leave(function () {
-    // 主播执行时 会触发访客端事件 peer-leave
-    // 访客执行时 不会触发
-    console.log(&quot;下播成功&quot;);
-    // 将 room 从直播间列表中移除
-    $.post(&quot;/removeRoom?room=&quot; + room, {}, function(data, textStatus, jqXHR) {
-        // do nothing
-    }, &#39;json&#39;);
-}, function (err) {
-    console.log(&quot;下播失败&quot;);
-});
-</code></pre>
-<pre><code class="java">protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-    // 获取待移除的直播间
-    String room = req.getParameter(&quot;room&quot;);
-    // 移除直播间
-    RoomListHolder.removeRoom(room);
-}
-</code></pre>
-<h3 id="访客端"><a href="#访客端" class="headerlink" title="访客端"></a>访客端</h3><blockquote>
-<p>访客通过浏览直播间列表，选择自己感兴趣的主播观看。</p>
-</blockquote>
-<h5 id="浏览直播间"><a href="#浏览直播间" class="headerlink" title="浏览直播间"></a>浏览直播间</h5><pre><code class="javascript">// 获取直播间列表数据
-$.get(&quot;/getRooms&quot;, function (data, status) {
-    var roomHtml = &#39;&#39;;
-
-    if (data == null) {
-        roomHtml = &#39;当前没有直播间&#39;;
-    } else {
-        $.each(data, function (i, room) {
-            roomHtml += &#39;&lt;div class=&quot;layui-col-md6&quot;&gt;\n&#39; +
-                &#39;            &lt;div class=&quot;layui-card&quot;&gt;\n&#39; +
-                &#39;                &lt;div class=&quot;layui-card-header&quot;&gt;&#39;+ room +&#39;&lt;/div&gt;\n&#39; +
-                &#39;                &lt;div class=&quot;layui-card-body&quot;&gt;\n&#39; +
-                &#39;                    &lt;button channel=&quot;&#39;+ room +&#39;&quot; class=&quot;layui-btn layui-btn-radius layui-btn-warm view&quot;&gt;\n&#39; +
-                &#39;                        &lt;i class=&quot;layui-icon&quot;&gt;&amp;#xe652;&lt;/i&gt; 观看\n&#39; +
-                &#39;                    &lt;/button&gt;\n&#39; +
-                &#39;                &lt;/div&gt;\n&#39; +
-                &#39;            &lt;/div&gt;\n&#39; +
-                &#39;        &lt;/div&gt;\n&#39; +
-                &#39;        &#39;;
-        });
-    }
-    // 渲染
-    $(&#39;#roomList&#39;).html(roomHtml);
-});
-</code></pre>
-<h5 id="观看直播"><a href="#观看直播" class="headerlink" title="观看直播"></a>观看直播</h5><blockquote>
-<p>访客观看直播，对于 Agora SDK 来说也就是加入直播间频道，并订阅频道视频流。</p>
-</blockquote>
-<pre><code class="javascript">client.join(null, room, null, function (uid) {
-    console.log(&quot;用户 &quot; + uid + &quot; 来到直播间 &quot; + room);
-}, function (err) {
-    console.log(&quot;加入直播间失败&quot;)
-});
-
-client.on(&#39;stream-added&#39;, function (evt) {
-    // 主播发布视频时会触发 stream-added 事件
-    var stream = evt.stream;
-    // 访客订阅 stream 流
-    client.subscribe(stream, function (err) {
-        console.log(&quot;视频流订阅失败&quot;, err);
-    });
-});
-
-client.on(&#39;stream-subscribed&#39;, function (evt) {
-    // 主播端视频流订阅成功后触发 stram-subscribed 事件
-    var stream = evt.stream;
-    // 按指定元素 ID 播放视频流
-    stream.play(&#39;video_remote&#39;);
-});
-
-
-client.on(&#39;stream-removed&#39;, function (evt) {
-    // 主播端执行 unpublish 时会触发该事件
-    var stream = evt.stream;
-    // 停止视频播放
-    stream.stop();
-});
-
-client.on(&#39;peer-leave&#39;, function (evt) {
-    // 主播端执行 leave 下播操作时会触发该事件
-    var stream = evt.stream;
-    if (stream) {
-        // 停止视频流播放
-        stream.stop();
-    }
-});
-</code></pre>
-<h3 id="弹幕"><a href="#弹幕" class="headerlink" title="弹幕"></a>弹幕</h3><p>本次只是对直播的简单实现，弹幕的功能暂时忽略吧，o(╯□╰)o</p>
-<h2 id="效果"><a href="#效果" class="headerlink" title="效果"></a>效果</h2><h2 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h2><h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p><strong><a href="https://juejin.im/post/5ca1fa9ff265da30b6219179" target="_blank" rel="noopener">Agora SDK 使用体验征文大赛 | 掘金技术征文，征文活动正在进行中</a></strong></p>
-
-      
-
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-      
-
-      
-        <p class="article-more-link">
-          <a class="article-more-a" href="/2019/04/14/声网sdk体验-直播/">展开全文 >></a>
-        </p>
-      
-
-      
-      <div class="clearfix"></div>
-    </div>
-  </div>
-</article>
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-    </div>
-</aside>
-
-
-
-
-  
     <article id="post-重拾-Mybatis-Mapper文件解析" class="article article-type-post  article-index" itemscope itemprop="blogPost">
   <div class="article-inner">
     
@@ -1119,6 +867,82 @@ SqlSessionFactory sqlSessionFactory = new SqlSessionFactoryBuilder().build(input
       
         <p class="article-more-link">
           <a class="article-more-a" href="/2019/03/01/LeetCode-数组-删除元素/">展开全文 >></a>
+        </p>
+      
+
+      
+      <div class="clearfix"></div>
+    </div>
+  </div>
+</article>
+
+<aside class="wrap-side-operation">
+    <div class="mod-side-operation">
+        
+        <div class="jump-container" id="js-jump-container" style="display:none;">
+            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
+                <i class="icon-font icon-back"></i>
+            </a>
+            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
+                <i class="icon-font icon-plane jump-plane"></i>
+            </div>
+        </div>
+        
+        
+    </div>
+</aside>
+
+
+
+
+  
+    <article id="post-重拾-Spring-IOC" class="article article-type-post  article-index" itemscope itemprop="blogPost">
+  <div class="article-inner">
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2019/02/27/重拾-Spring-IOC/">重拾-Spring IOC</a>
+    </h1>
+  
+
+        
+        <a href="/2019/02/27/重拾-Spring-IOC/" class="archive-article-date">
+  	<time datetime="2019-02-27T14:58:14.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2019-02-27</time>
+</a>
+        
+      </header>
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+        <h2 id="为何重拾"><a href="#为何重拾" class="headerlink" title="为何重拾"></a>为何重拾</h2><p>使用了 Spring 多年，但是对其底层的一些实现还是一知半解，一些概念比较模糊；故决定重新拾起，加深对 Spring 的认识。</p>
+        
+          <a class="article-more-a" href="/2019/02/27/重拾-Spring-IOC/#more">more >></a>
+        
+      
+
+      
+    </div>
+    <div class="article-info article-info-index">
+      
+      
+	<div class="article-tag tagcloud">
+		<i class="icon-price-tags icon"></i>
+		<ul class="article-tag-list">
+			 
+        		<li class="article-tag-list-item">
+        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color2">Spring</a>
+        		</li>
+      		
+		</ul>
+	</div>
+
+      
+
+      
+        <p class="article-more-link">
+          <a class="article-more-a" href="/2019/02/27/重拾-Spring-IOC/">展开全文 >></a>
         </p>
       
 
