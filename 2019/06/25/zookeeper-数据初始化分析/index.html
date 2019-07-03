@@ -8,18 +8,18 @@
   <link rel="dns-prefetch" href="https://www.hxlzpnyist.site">
   <title>zookeeper-数据初始化分析 | hxlzpnyist-断风雨</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
+  <meta name="description" content="概述在前两篇关于 zookeeper 的分析文章中，我们熟悉了其选举投票及集群间数据同步的过程，本文将针对 zookeeper 启动前的一个重要处理过程进行分析；也即是数据初始化 。">
 <meta name="keywords" content="zookeeper">
 <meta property="og:type" content="article">
 <meta property="og:title" content="zookeeper-数据初始化分析">
 <meta property="og:url" content="https://www.hxlzpnyist.site/2019/06/25/zookeeper-数据初始化分析/index.html">
 <meta property="og:site_name" content="hxlzpnyist-断风雨">
-<meta property="og:description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
+<meta property="og:description" content="概述在前两篇关于 zookeeper 的分析文章中，我们熟悉了其选举投票及集群间数据同步的过程，本文将针对 zookeeper 启动前的一个重要处理过程进行分析；也即是数据初始化 。">
 <meta property="og:locale" content="zh-cn">
-<meta property="og:updated_time" content="2019-06-27T09:58:17.031Z">
+<meta property="og:updated_time" content="2019-07-03T11:56:40.979Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="zookeeper-数据初始化分析">
-<meta name="twitter:description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
+<meta name="twitter:description" content="概述在前两篇关于 zookeeper 的分析文章中，我们熟悉了其选举投票及集群间数据同步的过程，本文将针对 zookeeper 启动前的一个重要处理过程进行分析；也即是数据初始化 。">
   
     <link rel="alternative" href="/atom.xml" title="hxlzpnyist-断风雨" type="application/atom+xml">
   
@@ -171,54 +171,9 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p><code>NIOServerCnxnFactory</code> 执行方法 <code>startup</code></p>
-<pre><code class="java">@Override
-public void startup(ZooKeeperServer zks) throws IOException,
-        InterruptedException {
-    start();
-    setZooKeeperServer(zks);
-    // 初始化内存数据库
-    zks.startdata();
-    zks.startup();
-}
-</code></pre>
-<p><code>ZooKeeperServer</code> 执行方法 <code>startdata</code></p>
-<pre><code class="java">public void startdata() throws IOException, InterruptedException {
-    //check to see if zkDb is not null
-    if (zkDb == null) {
-        // 创建 zk database 实例
-        zkDb = new ZKDatabase(this.txnLogFactory);
-    }  
-    if (!zkDb.isInitialized()) {
-        // 加载数据
-        loadData();
-    }
-}
-</code></pre>
-<pre><code class="java">public void loadData() throws IOException, InterruptedException {
-
-    if(zkDb.isInitialized()){
-        setZxid(zkDb.getDataTreeLastProcessedZxid());
-    }
-    else {
-        setZxid(zkDb.loadDataBase());
-    }
-
-    // Clean up dead sessions
-    LinkedList&lt;Long&gt; deadSessions = new LinkedList&lt;Long&gt;();
-    for (Long session : zkDb.getSessions()) {
-        if (zkDb.getSessionWithTimeOuts().get(session) == null) {
-            deadSessions.add(session);
-        }
-    }
-    zkDb.setDataTreeInit(true);
-    for (long session : deadSessions) {
-        // XXX: Is lastProcessedZxid really the best thing to use?
-        killSession(session, zkDb.getDataTreeLastProcessedZxid());
-    }
-}
-</code></pre>
-<p>调用 <code>ZKDatabase</code> 执行方法 <code>loadDataBase</code></p>
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>在前两篇关于 <code>zookeeper</code> 的分析文章中，我们熟悉了其选举投票及集群间数据同步的过程，本文将针对 <code>zookeeper</code> 启动前的一个重要处理过程进行分析；也即是<code>数据初始化</code> 。</p>
+<a id="more"></a>
+<p>通过调用追踪我们发现 <code>zookeeper</code> 最终会执行 <code>ZKDatabase</code> 的方法 <code>loadDataBase</code> 来完成数据初始化</p>
 <pre><code class="java">public long loadDataBase() throws IOException {
     PlayBackListener listener=new PlayBackListener(){
         public void onTxnLoaded(TxnHeader hdr,Record txn){
@@ -241,46 +196,11 @@ public void startup(ZooKeeperServer zks) throws IOException,
             PlayBackListener listener) throws IOException {
     // 快照文件加载至内存
     snapLog.deserialize(dt, sessions);
-    FileTxnLog txnLog = new FileTxnLog(dataDir);
-    // 加载比快照数据新的日志文件
-    TxnIterator itr = txnLog.read(dt.lastProcessedZxid+1);
-    long highestZxid = dt.lastProcessedZxid;
-    TxnHeader hdr;
-    try {
-        while (true) {
-            // iterator points to 
-            // the first valid txn when initialized
-            hdr = itr.getHeader();
-            if (hdr == null) {
-                //empty logs 
-                return dt.lastProcessedZxid;
-            }
-            if (hdr.getZxid() &lt; highestZxid &amp;&amp; highestZxid != 0) {
-                LOG.error(&quot;{}(higestZxid) &gt; {}(next log) for type {}&quot;,
-                        new Object[] { highestZxid, hdr.getZxid(),
-                                hdr.getType() });
-            } else {
-                highestZxid = hdr.getZxid();
-            }
-            try {
-                // 处理事务日志
-                processTransaction(hdr,dt,sessions, itr.getTxn());
-            } catch(KeeperException.NoNodeException e) {
-               throw new IOException(&quot;Failed to process transaction type: &quot; +
-                     hdr.getType() + &quot; error: &quot; + e.getMessage(), e);
-            }
-            listener.onTxnLoaded(hdr, itr.getTxn());
-            if (!itr.next()) 
-                break;
-        }
-    } finally {
-        if (itr != null) {
-            itr.close();
-        }
-    }
-    return highestZxid;
+
+    // ......
 }
 </code></pre>
+<p>下面我们将针对整个过程进行分析：</p>
 <h2 id="加载快照文件"><a href="#加载快照文件" class="headerlink" title="加载快照文件"></a>加载快照文件</h2><p><code>FileSnap</code> 通过反序列化快照文件，将数据写入内存数据库 <code>DataTree</code></p>
 <pre><code class="java">public long deserialize(DataTree dt, Map&lt;Long, Integer&gt; sessions)
             throws IOException {
@@ -424,7 +344,127 @@ public void startup(ZooKeeperServer zks) throws IOException,
 <blockquote>
 <p><code>zookeeper</code> 通过遍历 <code>snap file</code> 并反序列化解析 <code>snap file</code> 将其写入内存数据库 <code>dataTree</code>, 在该过程中会对 <code>check sum</code> 进行检查以确定 <code>snap file</code> 的正确性（一般来讲当 <code>snap file</code> 正确性通过后，只会解析最新的 <code>snap file</code>）；若没有一个正确的 <code>snap file</code> 则抛出异常说明启动失败，反之 <code>dataTree</code> 将会记录 <code>lastProcessedZxid</code> 。</p>
 </blockquote>
-<h2 id="加载事务日志文件"><a href="#加载事务日志文件" class="headerlink" title="加载事务日志文件"></a>加载事务日志文件</h2>
+<h2 id="加载事务日志文件"><a href="#加载事务日志文件" class="headerlink" title="加载事务日志文件"></a>加载事务日志文件</h2><p>下面我们继续对 <code>FileTxSnapLog</code> 的 <code>restore</code> 方法进行分析，<code>zookeeper</code> 在完成快照文件的处理之后，会加载事务日志文件并处理</p>
+<pre><code class="java">public long restore(DataTree dt, Map&lt;Long, Integer&gt; sessions, 
+            PlayBackListener listener) throws IOException {
+    // 快照文件加载至内存
+    snapLog.deserialize(dt, sessions);
+
+    // 构造 FileTxnLog 实例
+    FileTxnLog txnLog = new FileTxnLog(dataDir);
+    // 通过logDir zxid 构造 FileTxnIterator 实例并执行初始化动作
+    // 加载比快照数据新的日志文件并查找最接近快照的事务日志记录
+    TxnIterator itr = txnLog.read(dt.lastProcessedZxid+1);
+    long highestZxid = dt.lastProcessedZxid;
+    TxnHeader hdr;
+    // 省略
+}
+</code></pre>
+<p>在执行 </p>
+<pre><code class="java">TxnIterator itr = txnLog.read(dt.lastProcessedZxid+1);
+</code></pre>
+<p>时会构建 <code>FileTxnIterator</code> 实例并执行 <code>init</code> 动作，代码如下：</p>
+<pre><code class="java">public FileTxnIterator(File logDir, long zxid) throws IOException {
+  this.logDir = logDir;
+  this.zxid = zxid;
+  init();
+}
+</code></pre>
+<p>接下来我们看下其 <code>init</code> 中如何处理事务日志文件</p>
+<pre><code class="java">void init() throws IOException {
+    storedFiles = new ArrayList&lt;File&gt;();
+    // 查找 logDir 目录下的所有事务日志记录文件，并按 zxid 降序排列
+    List&lt;File&gt; files = Util.sortDataDir(FileTxnLog.getLogFiles(logDir.listFiles(), 0), &quot;log&quot;, false);
+
+    // storedFiles 用来记录 zxid 大于快照文件 zxid 的事务日志文件
+    for (File f: files) {
+        if (Util.getZxidFromName(f.getName(), &quot;log&quot;) &gt;= zxid) {
+            storedFiles.add(f);
+        }
+        // add the last logfile that is less than the zxid
+        else if (Util.getZxidFromName(f.getName(), &quot;log&quot;) &lt; zxid) {
+            storedFiles.add(f);
+            break;
+        }
+    }
+    // 因为一个事务日志文件中记录了多条事务日志，而事务日志文件名的后缀是当前文件的第一条事务记录的zxid
+    // 通过判断 hdr.getZxid &lt; zxid 查找最接近快照的事务记录
+    goToNextLog();
+    if (!next())
+        return;
+    while (hdr.getZxid() &lt; zxid) {
+        if (!next())
+            return;
+    }
+}
+</code></pre>
+<p>从 <code>init</code> 的实现可以看出 <code>zookeeper</code> 对事物日志文件的处理流程如下：</p>
+<ul>
+<li>首先查找 logDir 目录下所有的事务日志文件 (log 为前缀) 并按 zxid 降序</li>
+<li>将事务日志文件的后缀 zxid 与快照文件 zxid 进行比较，查找并记录最接近快照的事务日志文件</li>
+<li>读取事务日志文件，通过 <code>hdr.getZxid() &lt; zxid</code> 查找最接近快照的事务日志记录 </li>
+</ul>
+<h3 id="处理快照之后的事务"><a href="#处理快照之后的事务" class="headerlink" title="处理快照之后的事务"></a>处理快照之后的事务</h3><blockquote>
+<p>上文中通过加载事务日志文件查找到快照之后所提交的事务记录，下面就看下如何处理这些事务记录的</p>
+</blockquote>
+<pre><code class="java">public long restore(DataTree dt, Map&lt;Long, Integer&gt; sessions, 
+            PlayBackListener listener) throws IOException {
+    // 快照文件加载至内存
+    snapLog.deserialize(dt, sessions);
+    FileTxnLog txnLog = new FileTxnLog(dataDir);
+    // 加载比快照数据新的日志文件
+    TxnIterator itr = txnLog.read(dt.lastProcessedZxid+1);
+    long highestZxid = dt.lastProcessedZxid;
+    TxnHeader hdr;
+    try {
+        while (true) {
+            // iterator points to 
+            // the first valid txn when initialized
+            hdr = itr.getHeader();
+            if (hdr == null) {
+                //empty logs 
+                return dt.lastProcessedZxid;
+            }
+            if (hdr.getZxid() &lt; highestZxid &amp;&amp; highestZxid != 0) {
+                LOG.error(&quot;{}(higestZxid) &gt; {}(next log) for type {}&quot;,
+                        new Object[] { highestZxid, hdr.getZxid(),
+                                hdr.getType() });
+            } else {
+                highestZxid = hdr.getZxid();
+            }
+            try {
+                // 处理事务日志 写入内存数据库
+                processTransaction(hdr,dt,sessions, itr.getTxn());
+            } catch(KeeperException.NoNodeException e) {
+               throw new IOException(&quot;Failed to process transaction type: &quot; +
+                     hdr.getType() + &quot; error: &quot; + e.getMessage(), e);
+            }
+            // listener 回调将事务包装为 proposal 集群模式下同步至 follower
+            listener.onTxnLoaded(hdr, itr.getTxn());
+            // 继续下一条事务日志
+            if (!itr.next()) 
+                break;
+        }
+    } finally {
+        if (itr != null) {
+            itr.close();
+        }
+    }
+    return highestZxid;
+}
+</code></pre>
+<p>从 <code>restore</code> 的后续实现我们可以看出， <code>zookeeper</code> 在完成事务日志文件加载之后，会依次处理日志文件中每条事务记录：</p>
+<ul>
+<li>按事务类型处理事务记录，写入内存数据库</li>
+<li><code>listener</code> 回调事务加载事件；将事务包装为 <code>proposal</code> 存储到 <code>committedLog</code> 列表中，并分别记录 <code>maxCommittedLog</code>，<code>minCommittedLog</code> （参见上文中的<code>PlayBackListener</code>）</li>
+</ul>
+<h2 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h2><p>通过上文的分析，可以概括下 <code>zookeeper</code> 数据初始化的流程如下：</p>
+<ul>
+<li>加载快照文件，获取快照最新的 zxid</li>
+<li>加载事务日志文件，获取快照之后的事务记录</li>
+<li>处理快照之后的事务记录，写入内存</li>
+</ul>
+
       
 
       
@@ -465,17 +505,6 @@ public void startup(ZooKeeperServer zks) throws IOException,
 	</div>
 
       
-	<div class="article-category tagcloud">
-		<i class="icon-book icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="/categories/zookeeper//" class="article-tag-list-link color5">zookeeper</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
 
       
 
@@ -568,7 +597,7 @@ public void startup(ZooKeeperServer zks) throws IOException,
                 </span>
                 <span class="tooltip-content">
                     <div class="toc-article">
-                    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#概述"><span class="toc-number">1.</span> <span class="toc-text">概述</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载快照文件"><span class="toc-number">2.</span> <span class="toc-text">加载快照文件</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#查找有效的快照文件"><span class="toc-number">2.1.</span> <span class="toc-text">查找有效的快照文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#解析快照文件"><span class="toc-number">2.2.</span> <span class="toc-text">解析快照文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载事务日志文件"><span class="toc-number">3.</span> <span class="toc-text">加载事务日志文件</span></a></li></ol>
+                    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#概述"><span class="toc-number">1.</span> <span class="toc-text">概述</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载快照文件"><span class="toc-number">2.</span> <span class="toc-text">加载快照文件</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#查找有效的快照文件"><span class="toc-number">2.1.</span> <span class="toc-text">查找有效的快照文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#解析快照文件"><span class="toc-number">2.2.</span> <span class="toc-text">解析快照文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载事务日志文件"><span class="toc-number">3.</span> <span class="toc-text">加载事务日志文件</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#处理快照之后的事务"><span class="toc-number">3.1.</span> <span class="toc-text">处理快照之后的事务</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#小结"><span class="toc-number">4.</span> <span class="toc-text">小结</span></a></li></ol>
                     </div>
                 </span>
             </div>
