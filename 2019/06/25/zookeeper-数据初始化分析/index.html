@@ -8,18 +8,18 @@
   <link rel="dns-prefetch" href="https://www.hxlzpnyist.site">
   <title>zookeeper-数据初始化分析 | hxlzpnyist-断风雨</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="概述public class Demo {  }  加载快照文件&amp;lt;html&amp;gt;     &amp;lt;body&amp;gt;hhh&amp;lt;/body&amp;gt; &amp;lt;/html&amp;gt;  加载事务日志文件">
+  <meta name="description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
 <meta name="keywords" content="zookeeper">
 <meta property="og:type" content="article">
 <meta property="og:title" content="zookeeper-数据初始化分析">
 <meta property="og:url" content="https://www.hxlzpnyist.site/2019/06/25/zookeeper-数据初始化分析/index.html">
 <meta property="og:site_name" content="hxlzpnyist-断风雨">
-<meta property="og:description" content="概述public class Demo {  }  加载快照文件&amp;lt;html&amp;gt;     &amp;lt;body&amp;gt;hhh&amp;lt;/body&amp;gt; &amp;lt;/html&amp;gt;  加载事务日志文件">
+<meta property="og:description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
 <meta property="og:locale" content="zh-cn">
-<meta property="og:updated_time" content="2019-06-25T10:17:21.285Z">
+<meta property="og:updated_time" content="2019-06-27T09:58:17.031Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="zookeeper-数据初始化分析">
-<meta name="twitter:description" content="概述public class Demo {  }  加载快照文件&amp;lt;html&amp;gt;     &amp;lt;body&amp;gt;hhh&amp;lt;/body&amp;gt; &amp;lt;/html&amp;gt;  加载事务日志文件">
+<meta name="twitter:description" content="概述NIOServerCnxnFactory 执行方法 startup @Override public void startup(ZooKeeperServer zks) throws IOException,         InterruptedException {     start();     setZooKeeperServer(zks);     // 初始化内存数据库">
   
     <link rel="alternative" href="/atom.xml" title="hxlzpnyist-断风雨" type="application/atom+xml">
   
@@ -171,14 +171,259 @@
     
     <div class="article-entry" itemprop="articleBody">
       
-        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><pre><code class="java">public class Demo {
-
+        <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p><code>NIOServerCnxnFactory</code> 执行方法 <code>startup</code></p>
+<pre><code class="java">@Override
+public void startup(ZooKeeperServer zks) throws IOException,
+        InterruptedException {
+    start();
+    setZooKeeperServer(zks);
+    // 初始化内存数据库
+    zks.startdata();
+    zks.startup();
 }
 </code></pre>
-<h2 id="加载快照文件"><a href="#加载快照文件" class="headerlink" title="加载快照文件"></a>加载快照文件</h2><pre><code class="xml">&lt;html&gt;
-    &lt;body&gt;hhh&lt;/body&gt;
-&lt;/html&gt;
+<p><code>ZooKeeperServer</code> 执行方法 <code>startdata</code></p>
+<pre><code class="java">public void startdata() throws IOException, InterruptedException {
+    //check to see if zkDb is not null
+    if (zkDb == null) {
+        // 创建 zk database 实例
+        zkDb = new ZKDatabase(this.txnLogFactory);
+    }  
+    if (!zkDb.isInitialized()) {
+        // 加载数据
+        loadData();
+    }
+}
 </code></pre>
+<pre><code class="java">public void loadData() throws IOException, InterruptedException {
+
+    if(zkDb.isInitialized()){
+        setZxid(zkDb.getDataTreeLastProcessedZxid());
+    }
+    else {
+        setZxid(zkDb.loadDataBase());
+    }
+
+    // Clean up dead sessions
+    LinkedList&lt;Long&gt; deadSessions = new LinkedList&lt;Long&gt;();
+    for (Long session : zkDb.getSessions()) {
+        if (zkDb.getSessionWithTimeOuts().get(session) == null) {
+            deadSessions.add(session);
+        }
+    }
+    zkDb.setDataTreeInit(true);
+    for (long session : deadSessions) {
+        // XXX: Is lastProcessedZxid really the best thing to use?
+        killSession(session, zkDb.getDataTreeLastProcessedZxid());
+    }
+}
+</code></pre>
+<p>调用 <code>ZKDatabase</code> 执行方法 <code>loadDataBase</code></p>
+<pre><code class="java">public long loadDataBase() throws IOException {
+    PlayBackListener listener=new PlayBackListener(){
+        public void onTxnLoaded(TxnHeader hdr,Record txn){
+            Request r = new Request(null, 0, hdr.getCxid(),hdr.getType(),
+                    null, null);
+            r.txn = txn;
+            r.hdr = hdr;
+            r.zxid = hdr.getZxid();
+            // 将事务日志包装成 proposal 集群模式下会同步给follower
+            addCommittedProposal(r);
+        }
+    };
+
+    long zxid = snapLog.restore(dataTree,sessionsWithTimeouts,listener);
+    initialized = true;
+    return zxid;
+}
+</code></pre>
+<pre><code class="java">public long restore(DataTree dt, Map&lt;Long, Integer&gt; sessions, 
+            PlayBackListener listener) throws IOException {
+    // 快照文件加载至内存
+    snapLog.deserialize(dt, sessions);
+    FileTxnLog txnLog = new FileTxnLog(dataDir);
+    // 加载比快照数据新的日志文件
+    TxnIterator itr = txnLog.read(dt.lastProcessedZxid+1);
+    long highestZxid = dt.lastProcessedZxid;
+    TxnHeader hdr;
+    try {
+        while (true) {
+            // iterator points to 
+            // the first valid txn when initialized
+            hdr = itr.getHeader();
+            if (hdr == null) {
+                //empty logs 
+                return dt.lastProcessedZxid;
+            }
+            if (hdr.getZxid() &lt; highestZxid &amp;&amp; highestZxid != 0) {
+                LOG.error(&quot;{}(higestZxid) &gt; {}(next log) for type {}&quot;,
+                        new Object[] { highestZxid, hdr.getZxid(),
+                                hdr.getType() });
+            } else {
+                highestZxid = hdr.getZxid();
+            }
+            try {
+                // 处理事务日志
+                processTransaction(hdr,dt,sessions, itr.getTxn());
+            } catch(KeeperException.NoNodeException e) {
+               throw new IOException(&quot;Failed to process transaction type: &quot; +
+                     hdr.getType() + &quot; error: &quot; + e.getMessage(), e);
+            }
+            listener.onTxnLoaded(hdr, itr.getTxn());
+            if (!itr.next()) 
+                break;
+        }
+    } finally {
+        if (itr != null) {
+            itr.close();
+        }
+    }
+    return highestZxid;
+}
+</code></pre>
+<h2 id="加载快照文件"><a href="#加载快照文件" class="headerlink" title="加载快照文件"></a>加载快照文件</h2><p><code>FileSnap</code> 通过反序列化快照文件，将数据写入内存数据库 <code>DataTree</code></p>
+<pre><code class="java">public long deserialize(DataTree dt, Map&lt;Long, Integer&gt; sessions)
+            throws IOException {
+    // 查找有效的快照文件
+    List&lt;File&gt; snapList = findNValidSnapshots(100);
+    if (snapList.size() == 0) {
+        return -1L;
+    }
+
+    // 省略
+}
+</code></pre>
+<p>从 <code>deserialize</code> 实现可知， <code>zookeeper</code> 在处理快照文件时首先需要查找指定个数的有效快照文件； 若不存在快照文件则返回 -1 。</p>
+<h3 id="查找有效的快照文件"><a href="#查找有效的快照文件" class="headerlink" title="查找有效的快照文件"></a>查找有效的快照文件</h3><pre><code class="java">private List&lt;File&gt; findNValidSnapshots(int n) throws IOException {
+    // 查找 snapDir 目录下 snapshot 为前缀的快照文件；并按照 zxid 大小降序排列
+    List&lt;File&gt; files = Util.sortDataDir(snapDir.listFiles(),&quot;snapshot&quot;, false);
+    int count = 0;
+    List&lt;File&gt; list = new ArrayList&lt;File&gt;();
+    for (File f : files) {
+        try {
+            // 判断当前快照文件是否为有效文件
+            if (Util.isValidSnapshot(f)) {
+                list.add(f);
+                count++;
+                // 当有效快照文件个数 == n 时退出循环
+                if (count == n) {
+                    break;
+                }
+            }
+        } catch (IOException e) {
+            LOG.info(&quot;invalid snapshot &quot; + f, e);
+        }
+    }
+    return list;
+}
+</code></pre>
+<pre><code class="java">public static boolean isValidSnapshot(File f) throws IOException {
+    if (f==null || Util.getZxidFromName(f.getName(), &quot;snapshot&quot;) == -1)
+        return false;
+
+    // Check for a valid snapshot
+    // 随机读文件
+    RandomAccessFile raf = new RandomAccessFile(f, &quot;r&quot;);
+    try {
+        // including the header and the last / bytes
+        // the snapshot should be atleast 10 bytes
+        // 文件内容长度至少为 10 字节
+        if (raf.length() &lt; 10) {
+            return false;
+        }
+        // 指针移动到文件末尾 5 个字节处
+        raf.seek(raf.length() - 5);
+        byte bytes[] = new byte[5];
+        int readlen = 0;
+        int l;
+        // 读最后 5 字节至 bytes 字节数组中
+        while(readlen &lt; 5 &amp;&amp;
+              (l = raf.read(bytes, readlen, bytes.length - readlen)) &gt;= 0) {
+            readlen += l;
+        }
+        if (readlen != bytes.length) {
+            LOG.info(&quot;Invalid snapshot &quot; + f
+                    + &quot; too short, len = &quot; + readlen);
+            return false;
+        }
+        ByteBuffer bb = ByteBuffer.wrap(bytes);
+        int len = bb.getInt();
+        byte b = bb.get();
+        // 前 4 字节为整数 1，最后一个字节为 / 则为有效快照文件
+        if (len != 1 || b != &#39;/&#39;) {
+            LOG.info(&quot;Invalid snapshot &quot; + f + &quot; len = &quot; + len
+                    + &quot; byte = &quot; + (b &amp; 0xff));
+            return false;
+        }
+    } finally {
+        raf.close();
+    }
+
+    return true;
+}
+</code></pre>
+<blockquote>
+<p>从上述代码实现可知，<code>zookeeper</code> 的 <code>snap file</code> 具有以下特性：</p>
+</blockquote>
+<ul>
+<li>快照文件内容长度至少为 10 字节</li>
+<li>快照文件末尾 5 个字节内容为： 整形数字 <code>1</code> + 字符 <code>/</code></li>
+</ul>
+<pre><code>可以在后续生成快照文件时进行验证
+</code></pre><h3 id="解析快照文件"><a href="#解析快照文件" class="headerlink" title="解析快照文件"></a>解析快照文件</h3><pre><code class="java">public long deserialize(DataTree dt, Map&lt;Long, Integer&gt; sessions)
+            throws IOException {
+    // 查找有效的快照文件
+    List&lt;File&gt; snapList = findNValidSnapshots(100);
+    if (snapList.size() == 0) {
+        return -1L;
+    }
+    File snap = null;
+    boolean foundValid = false;
+    for (int i = 0; i &lt; snapList.size(); i++) {
+        snap = snapList.get(i);
+        InputStream snapIS = null;
+        CheckedInputStream crcIn = null;
+        try {
+            LOG.info(&quot;Reading snapshot &quot; + snap);
+            snapIS = new BufferedInputStream(new FileInputStream(snap));
+            crcIn = new CheckedInputStream(snapIS, new Adler32());
+            // 反序列化文件
+            InputArchive ia = BinaryInputArchive.getArchive(crcIn);
+            // 将文件内容写入 dataTree
+            deserialize(dt,sessions, ia);
+            // 文件校验和判断
+            // 若 checkSum 不一致则继续解析下一个快照文件
+            long checkSum = crcIn.getChecksum().getValue();
+            long val = ia.readLong(&quot;val&quot;);
+            if (val != checkSum) {
+                throw new IOException(&quot;CRC corruption in snapshot :  &quot; + snap);
+            }
+
+            // 实际上当最近的一个快照文件为有效文件的时候就会退出循环
+            foundValid = true;
+            break;
+        } catch(IOException e) {
+            LOG.warn(&quot;problem reading snap file &quot; + snap, e);
+        } finally {
+            if (snapIS != null) 
+                snapIS.close();
+            if (crcIn != null) 
+                crcIn.close();
+        } 
+    }
+
+    // 没有一个有效的快照文件，则启动失败
+    if (!foundValid) {
+        throw new IOException(&quot;Not able to find valid snapshots in &quot; + snapDir);
+    }
+    // 记录最近的 zxid
+    dt.lastProcessedZxid = Util.getZxidFromName(snap.getName(), &quot;snapshot&quot;);
+    return dt.lastProcessedZxid;
+}
+</code></pre>
+<blockquote>
+<p><code>zookeeper</code> 通过遍历 <code>snap file</code> 并反序列化解析 <code>snap file</code> 将其写入内存数据库 <code>dataTree</code>, 在该过程中会对 <code>check sum</code> 进行检查以确定 <code>snap file</code> 的正确性（一般来讲当 <code>snap file</code> 正确性通过后，只会解析最新的 <code>snap file</code>）；若没有一个正确的 <code>snap file</code> 则抛出异常说明启动失败，反之 <code>dataTree</code> 将会记录 <code>lastProcessedZxid</code> 。</p>
+</blockquote>
 <h2 id="加载事务日志文件"><a href="#加载事务日志文件" class="headerlink" title="加载事务日志文件"></a>加载事务日志文件</h2>
       
 
@@ -323,7 +568,7 @@
                 </span>
                 <span class="tooltip-content">
                     <div class="toc-article">
-                    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#概述"><span class="toc-number">1.</span> <span class="toc-text">概述</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载快照文件"><span class="toc-number">2.</span> <span class="toc-text">加载快照文件</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载事务日志文件"><span class="toc-number">3.</span> <span class="toc-text">加载事务日志文件</span></a></li></ol>
+                    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#概述"><span class="toc-number">1.</span> <span class="toc-text">概述</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载快照文件"><span class="toc-number">2.</span> <span class="toc-text">加载快照文件</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#查找有效的快照文件"><span class="toc-number">2.1.</span> <span class="toc-text">查找有效的快照文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#解析快照文件"><span class="toc-number">2.2.</span> <span class="toc-text">解析快照文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#加载事务日志文件"><span class="toc-number">3.</span> <span class="toc-text">加载事务日志文件</span></a></li></ol>
                     </div>
                 </span>
             </div>
@@ -483,15 +728,15 @@ return o(i(t),arguments.length<2?void 0:u(arguments[1]))}})},function(t,n,r){var
               </li>
              
               <li class="article-tag-list-item">
-                <a href="javascript:void(0)" class="js-tag color5">zookeeper</a>
-              </li>
-             
-              <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color4">vim</a>
               </li>
              
               <li class="article-tag-list-item">
                 <a href="javascript:void(0)" class="js-tag color1">netty</a>
+              </li>
+             
+              <li class="article-tag-list-item">
+                <a href="javascript:void(0)" class="js-tag color5">zookeeper</a>
               </li>
              
               <li class="article-tag-list-item">
