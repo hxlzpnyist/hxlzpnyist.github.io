@@ -6,22 +6,15 @@
   <meta name="renderer" content="webkit">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <link rel="dns-prefetch" href="https://www.hxlzpnyist.site">
-  <title>jdk之LinkedBlockingQueue | hxlzpnyist-断风雨</title>
+  <title>Archives: 2020/7 | hxlzpnyist-断风雨</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="description" content="概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。 分析前我们同样有以下疑问：  如何通过链表实现队列的 FIFO ? 如何保证队列操作的同步 ? 与 ArrayBlockingQueue 相比有如何优势 ?">
-<meta name="keywords" content="jdk">
-<meta property="og:type" content="article">
-<meta property="og:title" content="jdk之LinkedBlockingQueue">
-<meta property="og:url" content="https://www.hxlzpnyist.site/2018/01/26/jdk之LinkedBlockingQueue/index.html">
+  <meta property="og:type" content="website">
+<meta property="og:title" content="hxlzpnyist-断风雨">
+<meta property="og:url" content="https://www.hxlzpnyist.site/archives/2020/07/index.html">
 <meta property="og:site_name" content="hxlzpnyist-断风雨">
-<meta property="og:description" content="概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。 分析前我们同样有以下疑问：  如何通过链表实现队列的 FIFO ? 如何保证队列操作的同步 ? 与 ArrayBlockingQueue 相比有如何优势 ?">
 <meta property="og:locale" content="zh-cn">
-<meta property="og:image" content="https://i.loli.net/2019/06/21/5d0c7d9421b3689118.png">
-<meta property="og:updated_time" content="2019-06-21T06:47:48.233Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="jdk之LinkedBlockingQueue">
-<meta name="twitter:description" content="概述在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。 分析前我们同样有以下疑问：  如何通过链表实现队列的 FIFO ? 如何保证队列操作的同步 ? 与 ArrayBlockingQueue 相比有如何优势 ?">
-<meta name="twitter:image" content="https://i.loli.net/2019/06/21/5d0c7d9421b3689118.png">
+<meta name="twitter:title" content="hxlzpnyist-断风雨">
   
     <link rel="alternative" href="/atom.xml" title="hxlzpnyist-断风雨" type="application/atom+xml">
   
@@ -153,403 +146,49 @@
             <canvas data-colors="#eaeaea" data-sectionHeight="100" data-contentId="js-content" id="myCanvas1" class="anm-canvas"></canvas>
           </div>
           <div id="js-content" class="content-ll">
-            <article id="post-jdk之LinkedBlockingQueue" class="article article-type-post " itemscope itemprop="blogPost">
-  <div class="article-inner">
-    
-      <header class="article-header">
-        
+            
   
-    <h1 class="article-title" itemprop="name">
-      jdk之LinkedBlockingQueue
+  
+    
+    
+      
+      
+      <section class="archives-wrap">
+        <div class="archive-year-wrap">
+          <a href="/archives/2020" class="archive-year">2020</a>
+        </div>
+        <div class="archives">
+    
+    <article class="archive-article archive-type-post">
+  <div class="archive-article-inner">
+    <header class="archive-article-header">
+      	<div class="article-meta">
+	      	<a href="/2020/07/31/rocketmq源码分析-nameserver启动/" class="archive-article-date">
+  	<time datetime="2020-07-31T06:53:56.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2020-07-31</time>
+</a>
+        </div>
+    	 
+  
+    <h1 itemprop="name">
+      <a class="archive-article-title" href="/2020/07/31/rocketmq源码分析-nameserver启动/">rocketmq源码分析-nameserver启动</a>
     </h1>
   
 
-        
-        <a href="/2018/01/26/jdk之LinkedBlockingQueue/" class="archive-article-date">
-  	<time datetime="2018-01-26T06:18:59.000Z" itemprop="datePublished"><i class="icon-calendar icon"></i>2018-01-26</time>
-</a>
-        
-      </header>
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-        <h5 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h5><p>在上一篇文章中我们分析了 ArrayBlockingQueue ,　今天在看下采用链表结构实现的阻塞队列。</p>
-<p>分析前我们同样有以下疑问：</p>
-<ul>
-<li>如何通过链表实现队列的 FIFO ?</li>
-<li>如何保证队列操作的同步 ?</li>
-<li>与 ArrayBlockingQueue 相比有如何优势 ?</li>
-</ul>
-<a id="more"></a>
-<h5 id="定义"><a href="#定义" class="headerlink" title="定义"></a>定义</h5><p>同样首先我们先来看下 LinkedBlockingQueue 的相关属性定义如下：</p>
-<pre><code class="java">     /**
-     * 定义链表节点
-     *
-     * item : 节点存储的元素
-     * next : 当前节点的后继节点
-     */
-    static class Node&lt;E&gt; {
-        E item;
+        <div class="article-info info-on-right">
+          
+          
 
-        Node&lt;E&gt; next;
-
-        Node(E x) { item = x; }
-    }
-
-    /** 定义队列的容量 默认为 Integer.MAX_VALUE */
-    private final int capacity;
-
-    /** 定义当前队列的存储元素个数 */
-    private final AtomicInteger count = new AtomicInteger(0);
-
-    /**
-     * 队列头节点
-     * Invariant: head.item == null
-     */
-    private transient Node&lt;E&gt; head;
-
-    /**
-     * 队列尾节点
-     * Invariant: last.next == null
-     */
-    private transient Node&lt;E&gt; last;
-
-    /** Lock held by take, poll, etc */
-    private final ReentrantLock takeLock = new ReentrantLock();
-
-    /** Wait queue for waiting takes */
-    private final Condition notEmpty = takeLock.newCondition();
-
-    /** Lock held by put, offer, etc */
-    private final ReentrantLock putLock = new ReentrantLock();
-
-    /** Wait queue for waiting puts */
-    private final Condition notFull = putLock.newCondition();
-</code></pre>
-<p>从定义中有以下几个疑问：</p>
-<ul>
-<li>当前队列元素个数为什么采用原子操作类 AtomicInteger ? int 类型的变量为什么不可以？</li>
-<li>队列的头尾节点定义注释中为什么说 head last 都有一个不变性 item 永远为空 ?</li>
-</ul>
-<h5 id="构造"><a href="#构造" class="headerlink" title="构造"></a>构造</h5><pre><code class="java">    public LinkedBlockingQueue() {
-        // 队列默认容量为 int 最大值
-        this(Integer.MAX_VALUE);
-    }
-    public LinkedBlockingQueue(int capacity) {
-        if (capacity &lt;= 0) throw new IllegalArgumentException();
-        // 设置队列容量
-        this.capacity = capacity;
-        // 初始队列头尾节点
-        last = head = new Node&lt;E&gt;(null);
-    }
-</code></pre>
-<h5 id="API"><a href="#API" class="headerlink" title="API"></a>API</h5><h6 id="offer-E-e"><a href="#offer-E-e" class="headerlink" title="offer(E e)"></a>offer(E e)</h6><pre><code class="java">    public boolean offer(E e) {
-        if (e == null) throw new NullPointerException();
-        final AtomicInteger count = this.count;
-        if (count.get() == capacity)
-            // 若队列满了 返回 false; 说明插入失败
-            return false;
-        int c = -1;
-        // 定义节点
-        Node&lt;E&gt; node = new Node(e);
-        final ReentrantLock putLock = this.putLock;
-        putLock.lock();
-        try {
-            if (count.get() &lt; capacity) {
-                // 插入队列
-                enqueue(node);
-                // 队列元素个数加一，并返回原来的个数
-                c = count.getAndIncrement();
-                if (c + 1 &lt; capacity)
-                    // 队列未满唤醒因为队列满而阻塞的 put 操作
-                    notFull.signal();
-            }
-        } finally {
-            putLock.unlock();
-        }
-        // c == 0 说明队列曾经为空，那么需要唤醒阻塞在 take poll 操作上的线程
-        if (c == 0)
-            signalNotEmpty();
-        return c &gt;= 0;
-    }
-</code></pre>
-<pre><code class="java">    private void enqueue(Node&lt;E&gt; node) {
-        // 将原尾节点的后继节点 指向 node
-        // 将尾节点指针指向 node
-        last = last.next = node;
-    }
-</code></pre>
-<p>offer 之后 last 永远指向链表的最近插入的节点，所以 last 节点的 next 永远为空。</p>
-<h6 id="poll"><a href="#poll" class="headerlink" title="poll()"></a>poll()</h6><pre><code class="java">    public E poll() {
-        final AtomicInteger count = this.count;
-        if (count.get() == 0)
-            // 队列为空 返回 null
-            return null;
-        E x = null;
-        int c = -1;
-        final ReentrantLock takeLock = this.takeLock;
-        takeLock.lock();
-        try {
-            if (count.get() &gt; 0) {
-                // 出队 获取队列头部元素
-                x = dequeue();
-                // 队列元素个数减一 并返回原个数
-                c = count.getAndDecrement();
-                if (c &gt; 1)
-                    // 唤醒因队列为空而阻塞的 take poll 操作
-                    notEmpty.signal();
-            }
-        } finally {
-            takeLock.unlock();
-        }
-        // c== capacity 说明队列曾经满了有 offer put 线程阻塞，故需唤醒
-        if (c == capacity)
-            signalNotFull();
-        return x;
-    }
-</code></pre>
-<pre><code class="java">    private E dequeue() {
-        Node&lt;E&gt; h = head;
-        // 取 head 的后继节点
-        Node&lt;E&gt; first = h.next;
-        // 将 head 节点的 next 指向自己
-        h.next = h; // help GC
-        // 将 head 重新指向头节点
-        head = first;
-
-        E x = first.item;
-        // 将 item 置为空
-        first.item = null;
-        return x;
-    }
-</code></pre>
-<p>此时我们可以看出 LinkedBlockingQueue 中通过移动节点 head last 指针来实现队列的 FIFO; 效果如下图所示：</p>
-<p><img src="https://i.loli.net/2019/06/21/5d0c7d9421b3689118.png" alt></p>
-<pre><code>因为插入和获取头部操作里采用的是两个不同的锁，所以为了保持不同线程不同操作内队列元素个数的一致性所以采用 AtomicInteger 计算而非 int 类型。
-</code></pre><h6 id="put-E-e"><a href="#put-E-e" class="headerlink" title="put(E e)"></a>put(E e)</h6><pre><code class="java">public void put(E e) throws InterruptedException {
-        if (e == null) throw new NullPointerException();
-        // Note: convention in all put/take/etc is to preset local var
-        // holding count negative to indicate failure unless set.
-        int c = -1;
-        Node&lt;E&gt; node = new Node(e);
-        final ReentrantLock putLock = this.putLock;
-        final AtomicInteger count = this.count;
-        putLock.lockInterruptibly();
-        try {
-            while (count.get() == capacity) {
-                notFull.await();
-            }
-            enqueue(node);
-            c = count.getAndIncrement();
-            if (c + 1 &lt; capacity)
-                notFull.signal();
-        } finally {
-            putLock.unlock();
-        }
-        if (c == 0)
-            signalNotEmpty();
-    }
-</code></pre>
-<h6 id="take"><a href="#take" class="headerlink" title="take()"></a>take()</h6>
-      
-
-      
-        <div class="page-reward">
-          <a href="javascript:;" class="page-reward-btn tooltip-top">
-            <div class="tooltip tooltip-east">
-            <span class="tooltip-item">
-              赏
-            </span>
-            <span class="tooltip-content">
-              <span class="tooltip-text">
-                <span class="tooltip-inner">
-                  <p class="reward-p"><i class="icon icon-quo-left"></i>谢谢你请我吃糖果<i class="icon icon-quo-right"></i></p>
-                  <div class="reward-box">
-                    
-                    <div class="reward-box-item">
-                      <img class="reward-img" src="https://i.loli.net/2019/07/05/5d1ebcebe3a4b97471.png">
-                      <span class="reward-type">支付宝</span>
-                    </div>
-                    
-                    
-                    <div class="reward-box-item">
-                      <img class="reward-img" src="https://i.loli.net/2019/07/05/5d1ebd2fbadc911403.png">
-                      <span class="reward-type">微信</span>
-                    </div>
-                    
-                  </div>
-                </span>
-              </span>
-            </span>
-          </div>
-          </a>
         </div>
-      
-    </div>
-    <div class="article-info article-info-index">
-      
-      
-	<div class="article-tag tagcloud">
-		<i class="icon-price-tags icon"></i>
-		<ul class="article-tag-list">
-			 
-        		<li class="article-tag-list-item">
-        			<a href="javascript:void(0)" class="js-tag article-tag-list-link color4">jdk</a>
-        		</li>
-      		
-		</ul>
-	</div>
-
-      
-
-      
-
-      
-        
-<div class="share-btn share-icons tooltip-left">
-  <div class="tooltip tooltip-east">
-    <span class="tooltip-item">
-      <a href="javascript:;" class="share-sns share-outer">
-        <i class="icon icon-share"></i>
-      </a>
-    </span>
-    <span class="tooltip-content">
-      <div class="share-wrap">
-        <div class="share-icons">
-          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
-            <i class="icon icon-weibo"></i>
-          </a>
-          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
-            <i class="icon icon-weixin"></i>
-          </a>
-          <a class="qq share-sns" href="javascript:;" data-type="qq">
-            <i class="icon icon-qq"></i>
-          </a>
-          <a class="douban share-sns" href="javascript:;" data-type="douban">
-            <i class="icon icon-douban"></i>
-          </a>
-          <a class="qzone share-sns" href="javascript:;" data-type="qzone">
-            <i class="icon icon-qzone"></i>
-          </a>
-          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
-            <i class="icon icon-facebook"></i>
-          </a>
-          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
-            <i class="icon icon-twitter"></i>
-          </a>
-          <a class="google share-sns" href="javascript:;" data-type="google">
-            <i class="icon icon-google"></i>
-          </a>
-        </div>
-      </div>
-    </span>
-  </div>
-</div>
-
-<div class="page-modal wx-share js-wx-box">
-    <a class="close js-modal-close" href="javascript:;"><i class="icon icon-close"></i></a>
-    <p>扫一扫，分享到微信</p>
-    <div class="wx-qrcode">
-      <img src="//pan.baidu.com/share/qrcode?url=https://www.hxlzpnyist.site/2018/01/26/jdk之LinkedBlockingQueue/" alt="微信分享二维码">
-    </div>
-</div>
-
-<div class="mask js-mask"></div>
-      
-      <div class="clearfix"></div>
-    </div>
+        <div class="clearfix"></div>
+    </header>
   </div>
 </article>
-
-  
-<nav id="article-nav">
-  
-    <a href="/2018/02/26/数据结构-平衡二叉树/" id="article-nav-newer" class="article-nav-link-wrap">
-      <i class="icon-circle-left"></i>
-      <div class="article-nav-title">
-        
-          数据结构-平衡二叉树
-        
-      </div>
-    </a>
   
   
-    <a href="/2018/01/24/jdk之ArrayBlockingQueue/" id="article-nav-older" class="article-nav-link-wrap">
-      <div class="article-nav-title">jdk之ArrayBlockingQueue</div>
-      <i class="icon-circle-right"></i>
-    </a>
-  
-</nav>
-
-
-<aside class="wrap-side-operation">
-    <div class="mod-side-operation">
-        
-        <div class="jump-container" id="js-jump-container" style="display:none;">
-            <a href="javascript:void(0)" class="mod-side-operation__jump-to-top">
-                <i class="icon-font icon-back"></i>
-            </a>
-            <div id="js-jump-plan-container" class="jump-plan-container" style="top: -11px;">
-                <i class="icon-font icon-plane jump-plane"></i>
-            </div>
-        </div>
-        
-        
-        <div class="toc-container tooltip-left">
-            <i class="icon-font icon-category"></i>
-            <div class="tooltip tooltip-east">
-                <span class="tooltip-item">
-                </span>
-                <span class="tooltip-content">
-                    <div class="toc-article">
-                    <ol class="toc"><li class="toc-item toc-level-5"><a class="toc-link" href="#概述"><span class="toc-number">1.</span> <span class="toc-text">概述</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#定义"><span class="toc-number">2.</span> <span class="toc-text">定义</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#构造"><span class="toc-number">3.</span> <span class="toc-text">构造</span></a></li><li class="toc-item toc-level-5"><a class="toc-link" href="#API"><span class="toc-number">4.</span> <span class="toc-text">API</span></a><ol class="toc-child"><li class="toc-item toc-level-6"><a class="toc-link" href="#offer-E-e"><span class="toc-number">4.1.</span> <span class="toc-text">offer(E e)</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#poll"><span class="toc-number">4.2.</span> <span class="toc-text">poll()</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#put-E-e"><span class="toc-number">4.3.</span> <span class="toc-text">put(E e)</span></a></li><li class="toc-item toc-level-6"><a class="toc-link" href="#take"><span class="toc-number">4.4.</span> <span class="toc-text">take()</span></a></li></ol></li></ol>
-                    </div>
-                </span>
-            </div>
-        </div>
-        
-    </div>
-</aside>
-
-
-
-  
-  
+    </div></section>
   
 
-  
-
-  
-
-  
-
-  
-  
-<div id="vcomments" style="width: 80%;margin: 0 auto;"></div>
-<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
-<script src="//unpkg.com/valine/dist/Valine.min.js"></script>
-<script>
-   var notify = 'false' == true ? true : false;
-   var verify = 'false' == true ? true : false;
-    window.onload = function() {
-        new Valine({
-            el: '#vcomments',
-            notify: notify,
-            verify: verify,
-            app_id: "eMGsR0oYyKCWntUWOvPI30ul-gzGzoHsz",
-            app_key: "Foweb4btd057FvDg9X3M3r83",
-            placeholder: "说点什么",
-            avatar:"retro",
-            meta: ['nick','mail','link'],
-            pageSize: "10",
-            visitor: "false"
-        });
-    };
-</script>
-<noscript>Please enable JavaScript to view the <a href="https://valine.js.org">comments powered by Valine.</a></noscript>
-
-  
-
+    
 
 
           </div>
@@ -572,8 +211,8 @@
 	var yiliaConfig = {
 		mathjax: false,
 		isHome: false,
-		isPost: true,
-		isArchive: false,
+		isPost: false,
+		isArchive: true,
 		isTag: false,
 		isCategory: false,
 		open_in_new: false,
